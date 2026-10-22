@@ -7,6 +7,8 @@ import 'package:billingapp/mainscreen/services/auth_service.dart';
 import 'package:billingapp/mainscreen/theme/app_theme.dart';
 import 'package:billingapp/mainscreen/utils/constants.dart';
 import 'package:billingapp/mainscreen/screens/dashboard_screen.dart';
+import 'package:billingapp/Auth/billing dashboardc.dart';
+import 'package:billingapp/bussinjessscreate/select.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:billingapp/mainscreen/services/api_service.dart';
 import 'package:billingapp/mainscreen/services/security_service.dart';
@@ -24,6 +26,7 @@ import 'package:billingapp/mainscreen/appcontroler/appcontroler/device_service.d
 import 'package:billingapp/mainscreen/services/custom_flow_service.dart';
 import 'package:http/http.dart' as http;
 import 'package:billingapp/mainscreen/utils/api_debug_logger.dart';
+import 'package:billingapp/Auth/api service.dart' as billing_api;
 import 'dart:convert';
 import 'package:geolocator/geolocator.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -489,6 +492,24 @@ class _LoginScreenState extends State<LoginScreen> {
       if (!mounted) return;
 
       if (success) {
+        // Silently login to the billing backend
+        try {
+          final billingResponse = await billing_api.ApiService.loginUser({
+            "email": email,
+            "password": password,
+          });
+          final billingToken = billingResponse["token"] ?? billingResponse["data"]?["token"];
+          if (billingToken != null) {
+            final prefs = await SharedPreferences.getInstance();
+            await prefs.setString("billing_auth_token", billingToken);
+            await prefs.setString("cached_email", email);
+            await prefs.setString("cached_password", password);
+            print("Silent billing login succeeded. Token stored.");
+          }
+        } catch (e) {
+          print("Silent billing login failed: $e");
+        }
+
         final storageService = Provider.of<StorageService>(context, listen: false);
         final int userIdInt = int.tryParse(storageService.userId) ?? 12;
 
@@ -552,7 +573,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
         navigator.pushReplacement(
           PageRouteBuilder(
-            pageBuilder: (context, animation, secondaryAnimation) => DashboardScreen(),
+            pageBuilder: (context, animation, secondaryAnimation) => const BusinessSelectionPage(),
             transitionsBuilder: (context, animation, secondaryAnimation, child) {
               return FadeTransition(opacity: animation, child: child);
             },

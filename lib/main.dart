@@ -6,6 +6,7 @@ import 'Auth/login.dart';
 import 'Auth/select.dart';
 import 'Auth/billing dashboardc.dart';
 import 'Auth/role_selection.dart';
+import 'mainscreen/screens/login_screen.dart';
 import 'package:billingapp/utils/app_logger.dart';
 
 import 'package:billingapp/localization/translations.dart';
@@ -187,11 +188,7 @@ class MyApp extends StatelessWidget {
 
       // ✅ ROUTES
       routes: {
-        '/login': (context) => LoginPage(
-          onLogin: () {
-            AppLogger.success("User logged in via routes");
-          },
-        ),
+        '/login': (context) => const LoginScreen(),
       },
 
       // ✅ AUTH WRAPPER INSTEAD OF DIRECT LOGIN PAGE

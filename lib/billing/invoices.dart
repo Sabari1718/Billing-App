@@ -74,6 +74,30 @@ class _BillListScreenState extends State<BillListScreen> {
         url += "?business_id=$businessId";
       }
 
+      final tokenLen = localToken!.length;
+      final first20 = tokenLen >= 20 ? localToken!.substring(0, 20) : localToken!;
+      final last20 = tokenLen >= 20 ? localToken!.substring(tokenLen - 20) : localToken!;
+
+      print("==============================");
+      print("API REQUEST");
+      print("==============================");
+      print("Method: GET");
+      print("URL: $url");
+      print("");
+      print("Authorization:");
+      print("Bearer $localToken");
+      print("");
+      print("Token Length: $tokenLen");
+      print("First 20: $first20...");
+      print("Last 20: ...$last20");
+      print("");
+      print("Full Token (for debugging only):");
+      print(localToken);
+      print("");
+      print("Request Body:");
+      print("None");
+      print("");
+
       final response = await http.get(
         Uri.parse(url),
         headers: {
@@ -81,6 +105,13 @@ class _BillListScreenState extends State<BillListScreen> {
           "Authorization": "Bearer $localToken",
         },
       );
+
+      print("==============================");
+      print("API RESPONSE");
+      print("==============================");
+      print("Status: ${response.statusCode}");
+      print("");
+      print(response.body);
 
       AppLogger.api("GET", url, response.statusCode);
 

@@ -3,6 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:billingapp/utils/app_logger.dart';
 
 import '../Auth/api service.dart';
+import '../Auth/billing dashboardc.dart';
 import 'categoryselect.dart';
 
 class BusinessSelectionPage extends StatefulWidget {
@@ -84,7 +85,7 @@ class _BusinessSelectionPageState
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
-            builder: (_) => const CategoryGroupPage(),
+            builder: (_) => const DashboardUI(),
           ),
         );
       }

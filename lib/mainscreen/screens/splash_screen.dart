@@ -10,6 +10,7 @@ import 'package:billingapp/mainscreen/theme/app_theme.dart';
 import 'package:billingapp/mainscreen/utils/constants.dart';
 import 'package:billingapp/mainscreen/screens/login_screen.dart';
 import 'package:billingapp/mainscreen/screens/dashboard_screen.dart';
+import 'package:billingapp/Auth/billing dashboardc.dart';
 import 'package:billingapp/mainscreen/services/security_manager.dart';
 import 'package:billingapp/mainscreen/services/secure_storage_service.dart';
 import 'package:billingapp/mainscreen/services/api_service.dart';
@@ -238,7 +239,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
 
       if (!mounted) return;
       final Widget nextScreen = storageService.isLoggedIn 
-          ? const DashboardScreen() 
+          ? const DashboardUI() 
           : const LoginScreen();
 
       Navigator.of(context).pushReplacement(

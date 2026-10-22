@@ -3,19 +3,10 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../chartfile/getbulk.dart';
-import '../chartfile/getenq.dart';
-import '../chartfile/getsector.dart';
-import '../chartfile/postbulk.dart';
-import '../chartfile/postenq.dart';
-import '../chartfile/postsector.dart';
-
-import '../chatnew/user.dart';
-import '../chatnew/support_chat_screen.dart';
-import '../chatnew/chat_list_screen.dart';
 import 'theme.dart';
 import 'Auth/billing dashboardc.dart';
 import 'Auth/profile.dart';
+import 'mainscreen/screens/profile_screen.dart';
 
 
 
@@ -60,15 +51,7 @@ class _DashState extends State<Dash> {
   }
 
   void openChat() {
-    // Navigating to the Chat List (WhatsApp style) instead of a direct chat
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => ChatListScreen(
-          currentUserId: userId,
-        ),
-      ),
-    );
+    // Chat functionality removed
   }
 
   ////////////////////////////////////////////////////////////
@@ -207,61 +190,11 @@ class _DashState extends State<Dash> {
                 title: "Profile",
                 onTap: () {
                   Navigator.pop(context);
-                  Navigator.push(context, MaterialPageRoute(builder: (_) => ProfilePage()));
+                  Navigator.push(context, MaterialPageRoute(builder: (_) => const ProfileScreen()));
                 },
               ),
 
-              if (role == "propagater" || role == "propagator" || role == "admin") ...[
-                /// BULK ORDER
-                _drawerExpansionTile(
-                  icon: Icons.inventory_2_rounded,
-                  title: "Bulk Order",
-                  children: [
-                    _drawerSubItem(
-                      title: "Add Bulk Order",
-                      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => BulkOrderPage())),
-                    ),
-                    _drawerSubItem(
-                      title: "View Bulk Orders",
-                      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => GetBulk())),
-                    ),
-                  ],
-                ),
-              ],
 
-              if (role == "propagater" || role == "propagator" || role == "admin") ...[
-                /// ENQUIRY
-                _drawerExpansionTile(
-                  icon: Icons.question_answer_rounded,
-                  title: "Enquiry",
-                  children: [
-                    _drawerSubItem(
-                      title: "Add Enquiry",
-                      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SupportChatScreen())),
-                    ),
-                    _drawerSubItem(
-                      title: "View Enquiries",
-                      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => GetEnquiry(role: role, userId: userId))),
-                    ),
-                  ],
-                ),
-  
-                /// SECTOR
-                _drawerExpansionTile(
-                  icon: Icons.business_center_rounded,
-                  title: "Sector",
-                  children: [
-                    _drawerSubItem(
-                      title: "Add Sector",
-                      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => AddGets())),
-                    ),
-                    _drawerSubItem(
-                      title: "View Sectors",
-                      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => GetById(role: role, userId: userId))),
-                    ),
-                  ],
-                ),
-              ],
 
               const Divider(color: Colors.white10, indent: 20, endIndent: 20),
 
@@ -383,32 +316,7 @@ class _DashState extends State<Dash> {
                     crossAxisSpacing: 16,
                     mainAxisSpacing: 16,
                     children: [
-                      if (role == "propagater" || role == "propagator" || role == "admin") ...[
-                        AppDashboardCard(
-                          title: "Bulk Orders",
-                          icon: Icons.inventory_2_rounded,
-                          accentColor: AppColors.primary,
-                          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => BulkOrderPage())),
-                        ),
-                        AppDashboardCard(
-                          title: "New Enquiry",
-                          icon: Icons.contact_support_rounded,
-                          accentColor: AppColors.secondary,
-                          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SupportChatScreen())),
-                        ),
-                        AppDashboardCard(
-                          title: "Sectors",
-                          icon: Icons.category_rounded,
-                          accentColor: AppColors.success,
-                          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => AddGets())),
-                        ),
-                      ],
-                      AppDashboardCard(
-                        title: "All Chats",
-                        icon: Icons.chat_bubble_outline_rounded,
-                        accentColor: AppColors.accent,
-                        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ChatListScreen(currentUserId: userId))),
-                      ),
+
                       AppDashboardCard(
                         title: "Store",
                         icon: Icons.storefront_rounded,

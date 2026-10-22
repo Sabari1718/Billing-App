@@ -75,7 +75,7 @@ class ApiService {
 
     if (auth) {
       final prefs = await SharedPreferences.getInstance();
-      final token = prefs.getString("auth_token");
+      final token = prefs.getString("billing_auth_token") ?? prefs.getString("auth_token");
 
       if (token != null && token.isNotEmpty) {
         headers["Authorization"] = "Bearer $token";
@@ -1401,6 +1401,57 @@ class ApiService {
     } catch (e, stackTrace) {
       _logApiError("Delete Pin Auth API", "DELETE", url, e, stackTrace);
       return false;
+    }
+  }
+
+  static Future<Map<String, dynamic>> getNotifications() async {
+    const url = "/notifications";
+    try {
+      _logApiRequest("GET NOTIFICATIONS", "GET", url);
+      final res = await http.get(
+        Uri.parse("$baseUrl$url"),
+        headers: await _getHeaders(auth: true),
+      );
+      final success = res.statusCode >= 200 && res.statusCode < 300;
+      _logApiResponse("GET NOTIFICATIONS", res.statusCode, res.body, success: success);
+      return _handleResponse(res);
+    } catch (e, stackTrace) {
+      _logApiError("Get Notifications API", "GET", url, e, stackTrace);
+      return {};
+    }
+  }
+
+  static Future<Map<String, dynamic>> getUserPermissions() async {
+    const url = "/user/permissions";
+    try {
+      _logApiRequest("GET USER PERMISSIONS", "GET", url);
+      final res = await http.get(
+        Uri.parse("$baseUrl$url"),
+        headers: await _getHeaders(auth: true),
+      );
+      final success = res.statusCode >= 200 && res.statusCode < 300;
+      _logApiResponse("GET USER PERMISSIONS", res.statusCode, res.body, success: success);
+      return _handleResponse(res);
+    } catch (e, stackTrace) {
+      _logApiError("Get User Permissions API", "GET", url, e, stackTrace);
+      return {};
+    }
+  }
+
+  static Future<Map<String, dynamic>> clearAllNotifications() async {
+    const url = "/notifications/clear-all";
+    try {
+      _logApiRequest("CLEAR ALL NOTIFICATIONS", "DELETE", url);
+      final res = await http.delete(
+        Uri.parse("$baseUrl$url"),
+        headers: await _getHeaders(auth: true),
+      );
+      final success = res.statusCode >= 200 && res.statusCode < 300;
+      _logApiResponse("CLEAR ALL NOTIFICATIONS", res.statusCode, res.body, success: success);
+      return _handleResponse(res);
+    } catch (e, stackTrace) {
+      _logApiError("Clear All Notifications API", "DELETE", url, e, stackTrace);
+      return {};
     }
   }
 }
