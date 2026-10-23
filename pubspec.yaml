@@ -57,6 +57,7 @@ flutter:
 
   assets:
     - assets/
+    - assets/captcha/
 
 flutter_native_splash:
   color: "#ffffff"

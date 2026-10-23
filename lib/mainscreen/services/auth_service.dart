@@ -44,7 +44,7 @@ class AuthService {
   }
 
   // Checks credentials via login endpoint
-  Future<bool> login(String email, String password) async {
+  Future<bool> login(String email, String password, {int? captchaImageId}) async {
     const String url = "https://user.jobes24x7.com/api/login/authenticate";
 
     final deviceInfo = DeviceInfoPlugin();
@@ -85,12 +85,18 @@ class AuthService {
     print("PLATFORM: $platform");
 
     try {
+      final Map<String, dynamic> requestPayload = {
+        "email": email,
+        "password": password,
+      };
+      if (captchaImageId != null) {
+        requestPayload["captcha_image_id"] = captchaImageId;
+      }
+
+      print("[AuthService] POST $url payload: $requestPayload");
       final response = await _dio.post(
         url,
-        data: {
-          "email": email,
-          "password": password
-        },
+        data: requestPayload,
       );
 
       print("========== LOGIN REQUEST COMPLETED ==========");
@@ -101,18 +107,21 @@ class AuthService {
         throw NewDeviceDetectedException("New device detected");
       }
 
-      if (response.statusCode == 200) {
+      if (response.statusCode == 200 || response.statusCode == 201) {
         print("LOGIN SUCCESS");
         await _storageService.setUserDeviceId(deviceId);
         
         final storage = _StorageDebugAdapter(_storageService);
 
-        final responseData = jsonDecode(response.body);
+        final dynamic rawData = response.data;
+        final Map<String, dynamic> responseData = rawData is Map<String, dynamic>
+            ? rawData
+            : (rawData is String ? jsonDecode(rawData) : jsonDecode(response.toString()));
 
         print("========== FULL RESPONSE ==========");
         print(responseData);
 
-        final outerData = responseData['data'];
+        final outerData = responseData['data'] is Map ? responseData['data'] : responseData;
 
         print("========== OUTER DATA ==========");
         print(outerData);
@@ -211,10 +220,15 @@ class AuthService {
       print("STATUS CODE: ${e.response?.statusCode}");
       print("RESPONSE: ${e.response?.data}");
 
+      String? apiMsg;
+      if (e.response?.data is Map) {
+        apiMsg = e.response?.data['message']?.toString() ?? e.response?.data['error']?.toString();
+      }
+
       if (e.response?.statusCode == 401) {
         print("INVALID CREDENTIALS");
         print("LOGIN FAILED");
-        throw InvalidCredentialsException("Wrong email or password.");
+        throw InvalidCredentialsException(apiMsg ?? "Wrong email, password, or secret captcha image.");
       } else if (e.type == DioExceptionType.connectionTimeout || 
                  e.type == DioExceptionType.sendTimeout ||
                  e.type == DioExceptionType.receiveTimeout ||
@@ -223,7 +237,7 @@ class AuthService {
         throw NoInternetException("No internet connection. Please check your network.");
       } else {
         print("LOGIN FAILED");
-        throw Exception("An unexpected error occurred: ${e.message}");
+        throw Exception(apiMsg ?? "An unexpected error occurred: ${e.message}");
       }
     } catch (e) {
       print("========== LOGIN API ==========");

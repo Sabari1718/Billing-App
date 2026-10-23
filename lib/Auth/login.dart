@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:billingapp/utils/app_logger.dart';
 
 import 'api service.dart';
+import 'secret_image_verification_page.dart';
 
 class LoginPage extends StatefulWidget {
   final Function onLogin;
@@ -19,53 +20,81 @@ class _LoginPageState extends State<LoginPage> {
   String password = '';
   bool isLoading = false;
 
-  void handleSubmit() async {
-    setState(() => isLoading = true);
-
-    try {
-      final response = await ApiService.loginUser({
-        "email": email,
-        "password": password
-      });
-
-      final token = response["token"] ??
-          response["data"]?["token"] ??
-          response["access_token"] ??
-          response["data"]?["access_token"];
-
-      final userData = response["user"] ??
-          response["data"]?["user"] ??
-          (response["data"] != null && response["data"]["token"] == null
-              ? response["data"]
-              : null);
-
-      if (token != null) {
-        final prefs = await SharedPreferences.getInstance();
-
-        await prefs.setString("auth_token", token);
-        await prefs.remove("token");
-
-        if (userData != null) {
-          await prefs.setString("user", jsonEncode(userData));
-        }
-
-        AppLogger.success("User logged in successfully");
-
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (_) => BusinessSelectionPage(),
-          ),
-        );
-      } else {
-        showError("Token not received");
-      }
-    } catch (e) {
-      AppLogger.error("Login failed", e);
-      showError(e.toString());
+  void handleSubmit() {
+    if (email.trim().isEmpty || password.trim().isEmpty) {
+      showError("Please enter both email and password");
+      return;
     }
 
-    setState(() => isLoading = false);
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => SecretImageVerificationPage(
+          email: email.trim(),
+          password: password.trim(),
+          onVerified: (verificationContext, captchaImageId) async {
+            final scaffoldMessenger = ScaffoldMessenger.of(verificationContext);
+            final navigator = Navigator.of(verificationContext);
+
+            try {
+              final response = await ApiService.loginUser({
+                "email": email.trim(),
+                "password": password.trim(),
+                "captcha_image_id": captchaImageId,
+              });
+
+              final token = response["token"] ??
+                  response["data"]?["token"] ??
+                  response["access_token"] ??
+                  response["data"]?["access_token"];
+
+              final userData = response["user"] ??
+                  response["data"]?["user"] ??
+                  (response["data"] != null && response["data"]["token"] == null
+                      ? response["data"]
+                      : null);
+
+              if (token != null) {
+                final prefs = await SharedPreferences.getInstance();
+
+                await prefs.setString("auth_token", token);
+                await prefs.remove("token");
+
+                if (userData != null) {
+                  await prefs.setString("user", jsonEncode(userData));
+                }
+
+                AppLogger.success("User logged in successfully");
+
+                widget.onLogin();
+
+                navigator.pushAndRemoveUntil(
+                  MaterialPageRoute(
+                    builder: (_) => BusinessSelectionPage(),
+                  ),
+                  (route) => false,
+                );
+              } else {
+                scaffoldMessenger.showSnackBar(
+                  const SnackBar(
+                    content: Text("Token not received"),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+              }
+            } catch (e) {
+              AppLogger.error("Login failed", e);
+              scaffoldMessenger.showSnackBar(
+                SnackBar(
+                  content: Text(e.toString().replaceFirst("Exception: ", "")),
+                  backgroundColor: Colors.red,
+                ),
+              );
+            }
+          },
+        ),
+      ),
+    );
   }
 
   void showError(String msg) {

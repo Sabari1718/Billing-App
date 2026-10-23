@@ -30,6 +30,7 @@ import 'package:billingapp/Auth/api service.dart' as billing_api;
 import 'dart:convert';
 import 'package:geolocator/geolocator.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:billingapp/Auth/secret_image_verification_page.dart';
 
 
 
@@ -471,146 +472,175 @@ class _LoginScreenState extends State<LoginScreen> {
     if (_isLoggingIn) return;
     if (!_formKey.currentState!.validate()) return;
 
-    setState(() {
-      _isLoading = true;
-      _isLoggingIn = true;
-    });
+    FocusScope.of(context).unfocus();
 
-    final scaffoldMessenger = ScaffoldMessenger.of(context);
-    final navigator = Navigator.of(context);
-    
-    final authService = Provider.of<AuthService>(context, listen: false);
     final email = _emailController.text.trim();
     final password = _passwordController.text.trim();
 
-    try {
-      // Reset login history saved status for new login session
-      SecurityService.resetSessionHistoryState();
+    // Navigate to Captcha Verification Screen
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => SecretImageVerificationPage(
+          email: email,
+          password: password,
+          onVerified: (verificationContext, captchaImageId) async {
+            final scaffoldMessenger = ScaffoldMessenger.of(verificationContext);
+            final navigator = Navigator.of(verificationContext);
+            final authService = Provider.of<AuthService>(verificationContext, listen: false);
 
-      final success = await authService.login(email, password);
+            try {
+              // Reset login history saved status for new login session
+              SecurityService.resetSessionHistoryState();
 
-      if (!mounted) return;
+              final success = await authService.login(
+                email,
+                password,
+                captchaImageId: captchaImageId,
+              );
 
-      if (success) {
-        // Silently login to the billing backend
-        try {
-          final billingResponse = await billing_api.ApiService.loginUser({
-            "email": email,
-            "password": password,
-          });
-          final billingToken = billingResponse["token"] ?? billingResponse["data"]?["token"];
-          if (billingToken != null) {
-            final prefs = await SharedPreferences.getInstance();
-            await prefs.setString("billing_auth_token", billingToken);
-            await prefs.setString("cached_email", email);
-            await prefs.setString("cached_password", password);
-            print("Silent billing login succeeded. Token stored.");
-          }
-        } catch (e) {
-          print("Silent billing login failed: $e");
-        }
+              if (!mounted) return;
 
-        final storageService = Provider.of<StorageService>(context, listen: false);
-        final int userIdInt = int.tryParse(storageService.userId) ?? 12;
+              if (success) {
+                // Silently login to the billing backend
+                try {
+                  final billingResponse = await billing_api.ApiService.loginUser({
+                    "email": email,
+                    "password": password,
+                    "captcha_image_id": captchaImageId,
+                  });
+                  final billingToken = billingResponse["token"] ?? billingResponse["data"]?["token"];
+                  if (billingToken != null) {
+                    final prefs = await SharedPreferences.getInstance();
+                    await prefs.setString("billing_auth_token", billingToken);
+                    await prefs.setString("cached_email", email);
+                    await prefs.setString("cached_password", password);
+                    print("Silent billing login succeeded. Token stored.");
+                  }
+                } catch (e) {
+                  print("Silent billing login failed: $e");
+                }
 
-        // Synchronously or asynchronously trigger saving login history on the Node.js backend
-        SecurityService(ApiService()).saveLoginHistory(userId: userIdInt, method: 'pincode').catchError((err) {
-          print('DEBUG [LoginScreen]: Failed saving login history on backend: $err');
-          return <String, dynamic>{};
-        });
+                final storageService = Provider.of<StorageService>(verificationContext, listen: false);
+                final int userIdInt = int.tryParse(storageService.userId) ?? 12;
 
-        // Dynamic backend check: Require OTP verification if enabled
-        final settingsProvider = Provider.of<SecuritySettingsProvider>(context, listen: false);
-        await settingsProvider.fetchSettings(userId: userIdInt);
+                // Synchronously or asynchronously trigger saving login history on the Node.js backend
+                SecurityService(ApiService()).saveLoginHistory(userId: userIdInt, method: 'pincode').catchError((err) {
+                  print('DEBUG [LoginScreen]: Failed saving login history on backend: $err');
+                  return <String, dynamic>{};
+                });
 
-        final isSmsEnabled = settingsProvider.settings.firstWhere(
-          (s) => s.key == 'sms_otp',
-          orElse: () => SecuritySetting(key: 'sms_otp', title: '', subtitle: '', icon: Icons.sms, isEnabled: false),
-        ).isEnabled;
-        
-        final isWhatsappEnabled = settingsProvider.settings.firstWhere(
-          (s) => s.key == 'whatsapp_otp',
-          orElse: () => SecuritySetting(key: 'whatsapp_otp', title: '', subtitle: '', icon: Icons.chat, isEnabled: false),
-        ).isEnabled;
-        
-        final isEmailEnabled = settingsProvider.settings.firstWhere(
-          (s) => s.key == 'mail_otp',
-          orElse: () => SecuritySetting(key: 'mail_otp', title: '', subtitle: '', icon: Icons.email, isEnabled: false),
-        ).isEnabled;
+                // Dynamic backend check: Require OTP verification if enabled
+                final settingsProvider = Provider.of<SecuritySettingsProvider>(verificationContext, listen: false);
+                await settingsProvider.fetchSettings(userId: userIdInt);
 
-        if (isSmsEnabled || isWhatsappEnabled || isEmailEnabled) {
-          final bool verified = await navigator.push(
-            MaterialPageRoute(
-              builder: (context) => const MfaVerificationScreen(
-                actionDescription: 'authenticate and open your dashboard',
-              ),
-            ),
-          ) ?? false;
+                final isSmsEnabled = settingsProvider.settings.firstWhere(
+                  (s) => s.key == 'sms_otp',
+                  orElse: () => SecuritySetting(key: 'sms_otp', title: '', subtitle: '', icon: Icons.sms, isEnabled: false),
+                ).isEnabled;
+                
+                final isWhatsappEnabled = settingsProvider.settings.firstWhere(
+                  (s) => s.key == 'whatsapp_otp',
+                  orElse: () => SecuritySetting(key: 'whatsapp_otp', title: '', subtitle: '', icon: Icons.chat, isEnabled: false),
+                ).isEnabled;
+                
+                final isEmailEnabled = settingsProvider.settings.firstWhere(
+                  (s) => s.key == 'mail_otp',
+                  orElse: () => SecuritySetting(key: 'mail_otp', title: '', subtitle: '', icon: Icons.email, isEnabled: false),
+                ).isEnabled;
 
-          if (!verified) {
-            _showErrorSnackBar('MFA Required', 'Multi-Factor OTP verification failed or cancelled.');
-            return;
-          }
-        }
+                if (isSmsEnabled || isWhatsappEnabled || isEmailEnabled) {
+                  final bool verified = await navigator.push(
+                    MaterialPageRoute(
+                      builder: (context) => const MfaVerificationScreen(
+                        actionDescription: 'authenticate and open your dashboard',
+                      ),
+                    ),
+                  ) ?? false;
 
-        // Trigger gorgeous success feedback
-        scaffoldMessenger.showSnackBar(
-          SnackBar(
-            content: Row(
-              children: [
-                const Icon(Icons.check_circle_rounded, color: Colors.white),
-                SizedBox(width: 12.w),
-                const Text('Identity Verified successfully!'),
-              ],
-            ),
-            backgroundColor: AppConstants.accentColor,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          ),
-        );
+                  if (!verified) {
+                    scaffoldMessenger.showSnackBar(
+                      const SnackBar(
+                        content: Text('Multi-Factor OTP verification failed or cancelled.'),
+                      ),
+                    );
+                    return;
+                  }
+                }
 
-        await _storeDeviceAndAppDetails();
+                // Trigger gorgeous success feedback
+                scaffoldMessenger.showSnackBar(
+                  SnackBar(
+                    content: Row(
+                      children: [
+                        const Icon(Icons.check_circle_rounded, color: Colors.white),
+                        SizedBox(width: 12.w),
+                        const Text('Identity Verified successfully!'),
+                      ],
+                    ),
+                    backgroundColor: AppConstants.accentColor,
+                    behavior: SnackBarBehavior.floating,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                );
 
-        navigator.pushReplacement(
-          PageRouteBuilder(
-            pageBuilder: (context, animation, secondaryAnimation) => const BusinessSelectionPage(),
-            transitionsBuilder: (context, animation, secondaryAnimation, child) {
-              return FadeTransition(opacity: animation, child: child);
-            },
-            transitionDuration: const Duration(milliseconds: 500),
-          ),
-        );
-      } else {
-        _showErrorSnackBar('Access Denied', 'Invalid credentials. Check Email & Password.');
-      }
-    } on NewDeviceDetectedException {
-      if (!mounted) return;
-      _showErrorSnackBar('Verification Required', 'New device detected. Redirecting to verification page...');
-      Future.delayed(const Duration(milliseconds: 1500), () {
-        if (mounted) {
-          navigator.pushAndRemoveUntil(
-            MaterialPageRoute(builder: (context) => const SecurityTabAuthScreen()),
-            (route) => false,
-          );
-        }
-      });
-    } on InvalidCredentialsException catch (e) {
-      if (!mounted) return;
-      _showErrorSnackBar('Access Denied', e.message);
-    } on NoInternetException catch (e) {
-      if (!mounted) return;
-      _showErrorSnackBar('Connection Failure', e.message);
-    } catch (e) {
-      if (!mounted) return;
-      _showErrorSnackBar('Verification Error', e.toString().replaceAll('Exception: ', ''));
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-          _isLoggingIn = false;
-        });
-      }
-    }
+                await _storeDeviceAndAppDetails();
+
+                navigator.pushAndRemoveUntil(
+                  PageRouteBuilder(
+                    pageBuilder: (context, animation, secondaryAnimation) => BusinessSelectionPage(),
+                    transitionsBuilder: (context, animation, secondaryAnimation, child) {
+                      return FadeTransition(opacity: animation, child: child);
+                    },
+                    transitionDuration: const Duration(milliseconds: 500),
+                  ),
+                  (route) => false,
+                );
+              } else {
+                scaffoldMessenger.showSnackBar(
+                  const SnackBar(
+                    content: Text('Invalid credentials or captcha image.'),
+                    backgroundColor: Colors.redAccent,
+                  ),
+                );
+              }
+            } on NewDeviceDetectedException {
+              scaffoldMessenger.showSnackBar(
+                const SnackBar(
+                  content: Text('New device detected. Redirecting to verification page...'),
+                ),
+              );
+              Future.delayed(const Duration(milliseconds: 1500), () {
+                navigator.pushAndRemoveUntil(
+                  MaterialPageRoute(builder: (context) => const SecurityTabAuthScreen()),
+                  (route) => false,
+                );
+              });
+            } on InvalidCredentialsException catch (e) {
+              scaffoldMessenger.showSnackBar(
+                SnackBar(
+                  content: Text(e.message),
+                  backgroundColor: Colors.redAccent,
+                ),
+              );
+            } on NoInternetException catch (e) {
+              scaffoldMessenger.showSnackBar(
+                SnackBar(
+                  content: Text(e.message),
+                  backgroundColor: Colors.redAccent,
+                ),
+              );
+            } catch (e) {
+              scaffoldMessenger.showSnackBar(
+                SnackBar(
+                  content: Text(e.toString().replaceAll('Exception: ', '')),
+                  backgroundColor: Colors.redAccent,
+                ),
+              );
+            }
+          },
+        ),
+      ),
+    );
   }
 
   void _showErrorSnackBar(String title, String message) {
