@@ -10,7 +10,8 @@ part 'add_product_widgets.dart';
 part 'add_product_scanner.dart';
 
 class ProductEntryPage extends StatefulWidget {
-  const ProductEntryPage({super.key});
+  final Map<String, dynamic>? editItem;
+  const ProductEntryPage({super.key, this.editItem});
 
   @override
   State<ProductEntryPage> createState() => _ProductEntryPageState();
@@ -36,12 +37,12 @@ class _ProductEntryPageState extends State<ProductEntryPage> {
   final maxQtyController = TextEditingController();
   final barcodeController = TextEditingController();
 
+  String? _autofilledText;
   bool isLoading = true;
 
   // SCAN SETUP
   bool _isScanMode = false;
-  bool _isBarcodeMode = true;
-  String? _autofilledText;
+  bool _isBarcodeMode = false; // default to QR Code matching Photo 2
 
   // EDIT MODE
   int? editAllocationId;
@@ -52,6 +53,16 @@ class _ProductEntryPageState extends State<ProductEntryPage> {
   @override
   void initState() {
     super.initState();
+    if (widget.editItem != null) {
+      editAllocationId = widget.editItem!['id'];
+      editCategoryGroupId = widget.editItem!['category_group_id'];
+      editCategoryId = widget.editItem!['category_id'];
+      editBrandId = widget.editItem!['brand_id'];
+      selectedProductId = widget.editItem!['product_id'];
+      selectedProductName = widget.editItem!['name'];
+      minQtyController.text = widget.editItem!['min']?.toString() ?? "";
+      maxQtyController.text = widget.editItem!['max']?.toString() ?? "";
+    }
     loadInitialData();
   }
 
@@ -68,29 +79,51 @@ class _ProductEntryPageState extends State<ProductEntryPage> {
     bool isEditing = editAllocationId != null;
 
     return Scaffold(
-      backgroundColor: Colors.grey.shade50,
+      backgroundColor: const Color(0xFFF1F5F9), // Light background like web
       appBar: AppBar(
-        title: const Text("Product Entry"),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                color: const Color(0xFF2563EB).withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Icon(Icons.inventory_2_outlined, color: Color(0xFF2563EB), size: 20),
+            ),
+            const SizedBox(width: 10),
+            Text(
+              "Product Entry",
+              style: GoogleFonts.inter(
+                fontWeight: FontWeight.w700,
+                fontSize: 18,
+                color: const Color(0xFF0F172A),
+              ),
+            ),
+          ],
+        ),
         elevation: 0,
         backgroundColor: Colors.white,
-        foregroundColor: Colors.black87,
-        centerTitle: false,
+        foregroundColor: const Color(0xFF0F172A),
         actions: [
           Padding(
-            padding: const EdgeInsets.only(right: 16.0, top: 8, bottom: 8),
+            padding: const EdgeInsets.only(right: 16.0, top: 10, bottom: 10),
             child: ElevatedButton(
-              onPressed: () {},
+              onPressed: () {
+                _showAdvanceSearchDialog();
+              },
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF007BFF),
+                backgroundColor: const Color(0xFF2563EB),
+                foregroundColor: Colors.white,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(8),
                 ),
+                padding: const EdgeInsets.symmetric(horizontal: 16),
                 elevation: 0,
               ),
               child: Text(
                 "Advance Search",
                 style: GoogleFonts.inter(
-                  color: Colors.white,
                   fontWeight: FontWeight.bold,
                   fontSize: 12,
                 ),
@@ -98,183 +131,171 @@ class _ProductEntryPageState extends State<ProductEntryPage> {
             ),
           )
         ],
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(1),
+          child: Container(color: Colors.grey.shade200, height: 1),
+        ),
       ),
       body: isLoading
           ? const Center(child: CircularProgressIndicator())
           : SafeArea(
-              child: Column(
-                children: [
-                  Expanded(
-                    child: SingleChildScrollView(
-                      padding: const EdgeInsets.all(16),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(16),
+                child: Container(
+                  padding: const EdgeInsets.all(24),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: Colors.grey.shade200),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.02),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      )
+                    ],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      // Header Row with Icon & Title
+                      Row(
                         children: [
-                          Container(
-                            padding: const EdgeInsets.all(24),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(20),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withOpacity(0.03),
-                                  blurRadius: 20,
-                                  offset: const Offset(0, 4),
-                                )
-                              ],
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  isEditing ? "Edit Allocation Details" : "Allocation Details",
-                                  style: Theme.of(context)
-                                      .textTheme
-                                      .titleLarge
-                                      ?.copyWith(
-                                        fontWeight: FontWeight.w700,
-                                        color: Colors.black87,
-                                        letterSpacing: -0.5,
-                                      ),
-                                ),
-                                const SizedBox(height: 24),
-
-                                // Mode Toggle Button
-                                if (!isEditing) ...[
-                                  Center(
-                                    child: Container(
-                                      decoration: BoxDecoration(
-                                        color: Colors.grey.shade100,
-                                        borderRadius: BorderRadius.circular(30),
-                                      ),
-                                      padding: const EdgeInsets.all(4),
-                                      child: Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          _buildModeButton("Manual Entry", !_isScanMode, Icons.edit_note),
-                                          _buildModeButton("Scan Code", _isScanMode, Icons.qr_code_scanner),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(height: 24),
-                                ],
-
-                                // Scan Setup Area
-                                if (_isScanMode && !isEditing) ...[
-                                  _buildScanSetupArea(),
-                                  const SizedBox(height: 24),
-                                ],
-
-                                // Dropdowns Form Section
-                                if (!isEditing) ...[
-                                  _buildDropdownsFormArea(),
-                                ],
-
-                                if (isEditing) ...[
-                                  buildField(
-                                    "PRODUCT NAME",
-                                    TextFormField(
-                                      initialValue: selectedProductName ?? "",
-                                      enabled: false,
-                                      decoration: _inputDecoration("Product Name"),
-                                    ),
-                                  ),
-                                  const SizedBox(height: 16),
-                                  _buildResponsiveRow(
-                                    buildField(
-                                      "MIN QTY",
-                                      TextFormField(
-                                        controller: minQtyController,
-                                        keyboardType: TextInputType.number,
-                                        decoration: _inputDecoration("Enter Minimum Quantity"),
-                                      ),
-                                    ),
-                                    buildField(
-                                      "MAX QTY",
-                                      TextFormField(
-                                        controller: maxQtyController,
-                                        keyboardType: TextInputType.number,
-                                        decoration: _inputDecoration("Enter Maximum Quantity"),
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ],
+                          const Icon(Icons.folder_shared_outlined, color: Color(0xFF3B82F6), size: 24),
+                          const SizedBox(width: 8),
+                          Text(
+                            isEditing ? "Edit Product Entry" : "Product Entry",
+                            style: GoogleFonts.inter(
+                              fontWeight: FontWeight.w800,
+                              fontSize: 18,
+                              color: const Color(0xFF0F172A),
                             ),
                           ),
                         ],
                       ),
-                    ),
-                  ),
+                      const SizedBox(height: 20),
 
-                  // Bottom Action Bar
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.05),
-                          blurRadius: 10,
-                          offset: const Offset(0, -4),
+                      // Center Mode Toggle (Manual Entry / Scanner)
+                      if (!isEditing) ...[
+                        Center(
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF1F5F9),
+                              borderRadius: BorderRadius.circular(30),
+                              border: Border.all(color: Colors.grey.shade200),
+                            ),
+                            padding: const EdgeInsets.all(4),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                _buildModeButton("Manual Entry", !_isScanMode, Icons.search_rounded),
+                                _buildModeButton("Scanner", _isScanMode, Icons.qr_code_scanner_rounded),
+                              ],
+                            ),
+                          ),
                         ),
+                        const SizedBox(height: 24),
                       ],
-                    ),
-                    child: _buildResponsiveButtons(
-                      ElevatedButton(
-                        onPressed: isEditing ? cancelEdit : () => Navigator.pop(context),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.red.shade600,
-                          foregroundColor: Colors.white,
-                          elevation: 0,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14),
-                          ),
-                        ),
-                        child: Text(
-                          isEditing ? "CANCEL EDIT" : "CANCEL",
-                          style: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: 0.5,
-                          ),
+
+                      // Product Scan Setup Card (When Scanner is chosen, Photos 2 & 3)
+                      if (_isScanMode && !isEditing) ...[
+                        _buildScanSetupArea(),
+                        const SizedBox(height: 24),
+                      ],
+
+                      // Form Fields (CATEGORY, BRAND, PRODUCT, MIN QTY, MAX QTY)
+                      _buildDropdownsFormArea(),
+                      const SizedBox(height: 32),
+
+                      // Centered Action Buttons (Save [Blue] & Cancel [Red])
+                      Center(
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            SizedBox(
+                              width: 140,
+                              height: 44,
+                              child: ElevatedButton(
+                                onPressed: saveOrUpdate,
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFF60A5FA), // Soft blue like web button
+                                  foregroundColor: Colors.white,
+                                  elevation: 0,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                ),
+                                child: Text(
+                                  isEditing ? "Update" : "Save",
+                                  style: GoogleFonts.inter(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 16),
+                            SizedBox(
+                              width: 140,
+                              height: 44,
+                              child: ElevatedButton(
+                                onPressed: () {
+                                  if (widget.editItem != null) {
+                                    Navigator.pop(context);
+                                  } else {
+                                    cancelEdit();
+                                  }
+                                },
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFFEF4444), // Red button like web
+                                  foregroundColor: Colors.white,
+                                  elevation: 0,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                ),
+                                child: Text(
+                                  "Cancel",
+                                  style: GoogleFonts.inter(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                      Container(
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(14),
-                          gradient: const LinearGradient(
-                            colors: [Color(0xFF2563EB), Color(0xFF3B82F6)],
-                            begin: Alignment.centerLeft,
-                            end: Alignment.centerRight,
-                          ),
-                        ),
-                        child: ElevatedButton(
-                          onPressed: saveOrUpdate,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.transparent,
-                            shadowColor: Colors.transparent,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(14),
-                            ),
-                          ),
-                          child: Text(
-                            isEditing ? "UPDATE" : "SAVE",
-                            style: const TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.bold,
-                              letterSpacing: 0.5,
-                              color: Colors.white,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
+                    ],
                   ),
-                ],
+                ),
               ),
             ),
+    );
+  }
+
+  void _showAdvanceSearchDialog() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text("Advance Search", style: GoogleFonts.inter(fontWeight: FontWeight.bold)),
+        content: Text(
+          "Enter keywords, category or barcode to search product catalog.",
+          style: GoogleFonts.inter(color: Colors.grey.shade700, fontSize: 13),
+        ),
+        actions: [
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF2563EB),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            child: const Text("Close"),
+          )
+        ],
+      ),
     );
   }
 }

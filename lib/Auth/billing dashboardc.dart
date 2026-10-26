@@ -15,6 +15,10 @@ import 'package:billingapp/sales/sales_point.dart';
 import 'package:get/get.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:billingapp/product/stock entry.dart';
+import 'package:billingapp/product/stock_orders.dart';
+import 'package:billingapp/product/stock_status.dart';
+import 'package:billingapp/product/restock_requests.dart';
+import 'package:billingapp/product/inventory_settings.dart';
 
 import '../billing/Generate Bill.dart';
 import '../billing/invoices.dart';
@@ -29,6 +33,7 @@ import '../suppliers/Supplier Products.dart';
 import '../suppliers/Supplier Quotations.dart';
 import '../suppliers/add suppier.dart';
 import '../suppliers/supplier_list.dart';
+import '../suppliers/create_purchase_order.dart';
 import '../store/create_store.dart';
 import '../store/dynamic_selection.dart';
 import 'profile.dart';
@@ -142,6 +147,13 @@ class DashboardUI extends StatelessWidget {
         context,
         MaterialPageRoute(
           builder: (_) => BillingMenuPage(role: role),
+        ),
+      );
+    } else if (title == "Reorder") {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => ReorderMenuPage(role: role),
         ),
       );
     } else if (title == "Sales") {
@@ -429,7 +441,7 @@ class DashboardUI extends StatelessWidget {
                             buildCard(context, "Business Setup", Icons.domain, Colors.blue, currentRole),
                             buildCard(context, "Product", Icons.inventory_2_outlined, Colors.orange, currentRole),
                             buildCard(context, "Supplier", Icons.delivery_dining, Colors.orange, currentRole),
-                            buildCard(context, "Sales", Icons.point_of_sale, Colors.red, currentRole),
+                            buildCard(context, "Reorder", Icons.sync_alt, Colors.deepPurple, currentRole),
                             buildCard(context, "Billing", Icons.receipt_long, Colors.green, currentRole),
                             buildCard(context, "Seller Update", Icons.update_outlined, Colors.pink, currentRole),
                           ],
@@ -550,13 +562,16 @@ class ProductMenuPage extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.only(top: 16, bottom: 20),
         children: [
-          buildItem(context, "Storage", const StoragePage(), Icons.inventory_2_outlined, Colors.blue),
-          buildItem(context, "Add Product", const ProductEntryPage(), Icons.add_box_outlined, Colors.orange),
-          buildItem(context, "New Product", const NewProductScreen(), Icons.new_releases_outlined, Colors.deepOrange),
-          buildItem(context, "Product List", const ProductAllocationPage(), Icons.list_alt, Colors.purple),
-          buildItem(context, "Variant Master", const VariantMasterPage(), Icons.style_outlined, Colors.pink),
-          buildItem(context, "Stock Entry", StockEntryPage(), Icons.input_outlined, Colors.green),
-          buildItem(context, "Stock List", const StockListPage(), Icons.fact_check_outlined, Colors.teal),
+          buildItem(context, "Add Product", const ProductEntryPage(), Icons.add_box_outlined, Colors.blue),
+          buildItem(context, "Product List", const ProductAllocationPage(), Icons.format_list_bulleted, Colors.indigo),
+          buildItem(context, "Variant Master", const VariantMasterPage(), Icons.dashboard_customize_outlined, Colors.purple),
+          buildItem(context, "Stock Entry", StockEntryPage(), Icons.input_outlined, Colors.teal),
+          buildItem(context, "Stock List", const StockListPage(), Icons.fact_check_outlined, Colors.green),
+          buildItem(context, "Stock Orders", const StockOrdersPage(), Icons.receipt_long_outlined, Colors.amber.shade800),
+          buildItem(context, "Stock Status", const StockStatusPage(), Icons.analytics_outlined, Colors.cyan),
+          buildItem(context, "Restock Requests", const RestockRequestsPage(), Icons.published_with_changes_outlined, Colors.deepOrange),
+          buildItem(context, "Inventory Settings", const InventorySettingsPage(), Icons.tune_outlined, Colors.brown),
+          buildItem(context, "Storage", const StoragePage(), Icons.warehouse_outlined, Colors.blueGrey),
           buildItem(context, "Storage Allocation", const StorageAllocationPage(), Icons.hub_outlined, Colors.indigo),
         ],
       ),
@@ -583,7 +598,7 @@ class SupplierMenuPage extends StatelessWidget {
   final String role;
   const SupplierMenuPage({super.key, required this.role});
 
-  Widget buildItem(BuildContext context, String title, Widget page) {
+  Widget buildItem(BuildContext context, String title, Widget page, IconData icon, Color color) {
     return Card(
       elevation: 0,
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -596,10 +611,10 @@ class SupplierMenuPage extends StatelessWidget {
         leading: Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: Colors.orange.withOpacity(0.1),
+            color: color.withOpacity(0.1),
             borderRadius: BorderRadius.circular(12),
           ),
-          child: const Icon(Icons.business_center, color: Colors.orange),
+          child: Icon(icon, color: color),
         ),
         title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16)),
         trailing: Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey.shade400),
@@ -616,7 +631,6 @@ class SupplierMenuPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final controller = Get.put(SupplierMenuController());
-    bool isPropagator = role == "propagator" || role == "propagater" || role == "admin";
 
     return Scaffold(
       backgroundColor: const Color(0xFFF3F4F6),
@@ -626,14 +640,72 @@ class SupplierMenuPage extends StatelessWidget {
         return ListView(
           padding: const EdgeInsets.only(top: 16, bottom: 20),
           children: [
-            buildItem(context, "Add Supplier", AddSupplierScreen()), 
-            buildItem(context, "View Suppliers", const SupplierListPage()),
-            buildItem(context, "Supplier Products", SupplierProductsPage(token: currentToken)),
-            buildItem(context, "Quotations", SupplierQuotationPage(token: currentToken)),
-            buildItem(context, "Orders Received", SupplierOrdersPage(token: currentToken)),
-            buildItem(context, "Payments", const SupplierPaymentsPage()),
-            buildItem(context, "Shipments", const DeliveriesPage()),
-            buildItem(context, "Delivery Options", const DeliveryChargesPage()),
+            buildItem(context, "View Suppliers", const SupplierListPage(), Icons.people_alt_outlined, Colors.blue),
+            buildItem(context, "Supplier Product & Category", SupplierProductsPage(token: currentToken), Icons.category_outlined, Colors.orange),
+            buildItem(context, "Create Services", const PlaceholderDetailPage(title: "Create Services"), Icons.design_services_outlined, Colors.teal),
+            buildItem(context, "List Services", const PlaceholderDetailPage(title: "List Services"), Icons.format_list_bulleted_outlined, Colors.indigo),
+            buildItem(context, "Quotations", SupplierQuotationPage(token: currentToken), Icons.request_quote_outlined, Colors.purple),
+          ],
+        );
+      }),
+    );
+  }
+}
+
+class ReorderMenuPage extends StatelessWidget {
+  final String role;
+  const ReorderMenuPage({super.key, required this.role});
+
+  Widget buildItem(BuildContext context, String title, Widget page, IconData icon, Color color) {
+    return Card(
+      elevation: 0,
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: Colors.grey.shade200),
+      ),
+      child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+        leading: Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Icon(icon, color: color),
+        ),
+        title: Text(
+          title,
+          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
+        ),
+        trailing: Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey.shade400),
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => page),
+          );
+        },
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final controller = Get.put(SupplierMenuController());
+
+    return Scaffold(
+      backgroundColor: const Color(0xFFF3F4F6),
+      appBar: AppBar(
+        title: const Text("Reorder"),
+      ),
+      body: Obx(() {
+        final currentToken = controller.token.value;
+        return ListView(
+          padding: const EdgeInsets.only(top: 16, bottom: 20),
+          children: [
+            buildItem(context, "Reorders", CreatePurchaseOrderPage(token: currentToken), Icons.sync_alt, Colors.blue),
+            buildItem(context, "Reorders list", SupplierOrdersPage(token: currentToken), Icons.format_list_bulleted, Colors.orange),
+            buildItem(context, "Supplier bill", const PurchaseBillEntryPage(), Icons.receipt_long, Colors.purple),
           ],
         );
       }),
@@ -646,7 +718,7 @@ class BillingMenuPage extends StatelessWidget {
   const BillingMenuPage({super.key, required this.role});
 
   Widget buildItem(
-      BuildContext context, String title, IconData icon, Widget page) {
+      BuildContext context, String title, IconData icon, Widget page, Color color) {
     return Card(
       elevation: 0,
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -658,10 +730,10 @@ class BillingMenuPage extends StatelessWidget {
         leading: Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: Colors.deepPurple.withOpacity(0.1),
+            color: color.withOpacity(0.1),
             borderRadius: BorderRadius.circular(12),
           ),
-          child: Icon(icon, color: Colors.deepPurple),
+          child: Icon(icon, color: color),
         ),
         title: Text(title,
             style: const TextStyle(fontWeight: FontWeight.w600)),
@@ -680,13 +752,14 @@ class BillingMenuPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: const Color(0xFFF3F4F6),
       appBar: AppBar(title: const Text("Billing")),
       body: ListView(
+        padding: const EdgeInsets.only(top: 16, bottom: 20),
         children: [
-          buildItem(context, "Generate Bill", Icons.receipt_long, CustomerScreen()),
-          buildItem(context, "Invoices", Icons.description, const BillListScreen(token: '')),
-          buildItem(context, "Purchase Bill", Icons.payment, const PurchaseBillEntryPage()),
-          buildItem(context, "Purchase List", Icons.list_alt, const PurchaseListPage()),
+          buildItem(context, "Generate Bill", Icons.receipt_long, CustomerScreen(), Colors.blue),
+          buildItem(context, "Invoices", Icons.description_outlined, const BillListScreen(token: ''), Colors.green),
+          buildItem(context, "Returns", Icons.assignment_return_outlined, const PlaceholderDetailPage(title: "Returns"), Colors.deepOrange),
         ],
       ),
     );
@@ -829,9 +902,11 @@ class SellerUpdateMenuPage extends StatelessWidget {
         children: [
           buildItem(context, "Purchase Charge", const PurchaseBillEntryPage(), Icons.payment, Colors.blue),
           buildItem(context, "Purchase List", const PurchaseListPage(), Icons.list_alt, Colors.orange),
-          buildItem(context, "Pricing and Offers", const PricingOffersPage(), Icons.local_offer, Colors.purple),
+          buildItem(context, "Pricing & Offers", const PricingOffersPage(), Icons.local_offer, Colors.purple),
           buildItem(context, "Seller Update", const SellerUpdatePage(), Icons.update, Colors.green),
           buildItem(context, "Delivery Charges", const DeliveryChargesPage(), Icons.local_shipping, Colors.teal),
+          buildItem(context, "Terms & Conditions", const PlaceholderDetailPage(title: "Terms & Conditions"), Icons.article_outlined, Colors.indigo),
+          buildItem(context, "Warranty & Guarantee", const PlaceholderDetailPage(title: "Warranty & Guarantee"), Icons.verified_user_outlined, Colors.deepOrange),
         ],
       ),
     );

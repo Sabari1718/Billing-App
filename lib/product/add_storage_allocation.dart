@@ -1,84 +1,164 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:google_fonts/google_fonts.dart';
-
-part 'add_storage_allocation_logic.dart';
 
 class AddStorageAllocationPage extends StatefulWidget {
   final int storageTypeId;
   final String storageTypeName;
+  final Map<String, dynamic>? initialData;
 
   const AddStorageAllocationPage({
     super.key,
     required this.storageTypeId,
     required this.storageTypeName,
+    this.initialData,
   });
 
   @override
   State<AddStorageAllocationPage> createState() => _AddStorageAllocationPageState();
 }
 
-class _AddStorageAllocationPageState extends State<AddStorageAllocationPage> with AddStorageAllocationLogic {
+class _AddStorageAllocationPageState extends State<AddStorageAllocationPage> {
+  // Toggle: With Variant vs Without Variant (Photo 2)
+  bool isWithVariant = true;
+
+  // Selected Stock Component values
+  String selectedStockName = "6A4 DIODE 6 AMP";
+  String selectedVariant = "Imported (5)";
+  String selectedStockDist = "Select Location";
+
+  final List<String> stockNameOptions = [
+    "6A4 DIODE 6 AMP",
+    "SIM 900A GSM MODULE",
+    "A4988 STEPPER MOTOR DRIVER",
+    "ULN2003 STEPPER DRIVER",
+    "BIG BUZZER 12V",
+    "RED LASER DIODE 5MW",
+    "DRV8825 STEPPER DRIVER",
+  ];
+
+  final List<String> variantOptions = [
+    "Imported (5)",
+    "Standard (2)",
+    "Red Board (4)",
+    "Standard (8)",
+    "12V Active (17)",
+    "5V Dot (7)",
+    "Purple (1)",
+  ];
+
+  final List<String> stockDistOptions = [
+    "Select Location",
+    "Shop In Sales",
+    "Main Warehouse",
+    "Display Counter",
+  ];
+
+  // Previous configuration banner (Photo 2)
+  bool showPreviousConfig = true;
+  List<String> previousConfigParts = [
+    "CP Building",
+    "Floor 1",
+    "Electronics Rack 1",
+    "Shelf 5",
+    "Diode1",
+    "6A4 Diode",
+  ];
+
+  // Define Location Path selections
+  String selectedBuilding = "CP Building";
+  String selectedFloor = "Floor 1";
+  String selectedRack = "Electronics Rack 1";
+  String selectedShelf = "Shelf 5";
+  String selectedBox = "Diode1";
+  String selectedContainer = "6A4 Diode";
+
+  final List<String> buildingOptions = ["CP Building", "Warehouse A", "Main Facility"];
+  final List<String> floorOptions = ["Floor 1", "Floor 2", "Ground Floor"];
+  final List<String> rackOptions = ["Electronics Rack 1", "Hardware Rack 2", "Parts Rack 3"];
+  final List<String> shelfOptions = ["Shelf 4", "Shelf 5", "Shelf 6"];
+  final List<String> boxOptions = ["Diode1", "GSM", "PCB Stepper Motor Driver", "Big Buzzer", "Light Layer"];
+  final List<String> containerOptions = ["6A4 Diode", "GPS", "A4988", "ULN2003", "Laser Diode", "DRV8825"];
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.initialData != null) {
+      final data = widget.initialData!;
+      if (data['stockName'] != null) selectedStockName = data['stockName'];
+      if (data['variant'] != null) selectedVariant = data['variant'];
+      if (data['typeDist'] != null) selectedStockDist = data['typeDist'];
+
+      if (data['hierarchy'] != null && data['hierarchy'] is Map) {
+        final h = data['hierarchy'] as Map;
+        if (h['Building'] != null) selectedBuilding = h['Building'];
+        if (h['Floor'] != null) selectedFloor = h['Floor'];
+        if (h['Rack'] != null) selectedRack = h['Rack'];
+        if (h['Shelf'] != null) selectedShelf = h['Shelf'];
+        if (h['Box'] != null) selectedBox = h['Box'];
+        if (h['Container'] != null) selectedContainer = h['Container'];
+      }
+    }
+  }
+
+  void _saveAllocation() {
+    final updatedItem = {
+      if (widget.initialData != null) "id": widget.initialData!['id'],
+      if (widget.initialData != null) "sNo": widget.initialData!['sNo'],
+      "locationPath": "${widget.storageTypeName} > $selectedBuilding > $selectedFloor > $selectedRack > $selectedShelf > $selectedBox > $selectedContainer",
+      "product": widget.initialData != null ? widget.initialData!['product'] : "Product #${DateTime.now().millisecondsSinceEpoch % 10000}",
+      "stockName": selectedStockName,
+      "variant": selectedVariant,
+      "typeDist": selectedStockDist == "Select Location" ? "Shop In Sales" : selectedStockDist,
+      "allocatedQty": widget.initialData != null ? widget.initialData!['allocatedQty'] : 5,
+      "code": "QR/Barcode",
+      "hierarchy": {
+        "Building": selectedBuilding,
+        "Floor": selectedFloor,
+        "Rack": selectedRack,
+        "Shelf": selectedShelf,
+        "Box": selectedBox,
+        "Container": selectedContainer,
+      },
+    };
+
+    Navigator.pop(context, updatedItem);
+  }
+
   @override
   Widget build(BuildContext context) {
-    // Dynamic matching of selected stock ID
-    final int? selectedStockId = _selectedStock != null 
-        ? (_selectedStock!['id'] ?? _selectedStock!['product_id']) as int?
-        : null;
-
-    // Dynamic matching of selected variant ID
-    final int? selectedVariantId = _selectedVariant != null 
-        ? (_selectedVariant!['id']) as int?
-        : null;
-
-    // Retrieve active leaf box and generate partitions
-    final leafBox = _getSelectedLeafBox();
-    final int rows = leafBox != null ? int.tryParse(leafBox['partition_rows']?.toString() ?? '') ?? 0 : 0;
-    final int cols = leafBox != null ? int.tryParse(leafBox['partition_columns']?.toString() ?? '') ?? 0 : 0;
-    final hasPartitions = rows > 0 || cols > 0;
-    final partitionList = hasPartitions ? _generatePartitions(rows, cols) : <String>[];
-
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
+        titleSpacing: 0,
         title: Row(
           children: [
             GestureDetector(
               onTap: () => Navigator.pop(context),
               child: Text(
-                "Back to Storages",
+                "Back to storages",
                 style: GoogleFonts.inter(
-                  fontSize: 14,
+                  fontSize: 13,
                   fontWeight: FontWeight.bold,
                   color: const Color(0xFF0F172A),
                 ),
               ),
             ),
             const SizedBox(width: 8),
-            Container(
-              height: 16,
-              width: 1.5,
-              color: const Color(0xFFCBD5E1),
-            ),
+            Container(height: 14, width: 1.5, color: const Color(0xFFCBD5E1)),
             const SizedBox(width: 8),
             Expanded(
               child: RichText(
                 overflow: TextOverflow.ellipsis,
                 text: TextSpan(
                   text: "Allocating in: ",
-                  style: GoogleFonts.inter(
-                    fontSize: 14,
-                    color: const Color(0xFF64748B),
-                  ),
+                  style: GoogleFonts.inter(fontSize: 13, color: const Color(0xFF64748B)),
                   children: [
                     TextSpan(
                       text: widget.storageTypeName,
                       style: GoogleFonts.inter(
-                        fontSize: 14,
+                        fontSize: 13,
                         fontWeight: FontWeight.bold,
-                        color: const Color(0xFF7C3AED),
+                        color: const Color(0xFF2563EB),
                       ),
                     ),
                   ],
@@ -88,546 +168,565 @@ class _AddStorageAllocationPageState extends State<AddStorageAllocationPage> wit
           ],
         ),
         backgroundColor: Colors.white,
-        elevation: 0.5,
-        automaticallyImplyLeading: false,
+        elevation: 0,
+        surfaceTintColor: Colors.white,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Color(0xFF0F172A), size: 18),
+          icon: const Icon(Icons.arrow_back, color: Color(0xFF0F172A)),
           onPressed: () => Navigator.pop(context),
         ),
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(1),
+          child: Container(height: 1, color: Colors.grey.shade200),
+        ),
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator(color: Color(0xFF4F46E5)))
-          : _errorMessage.isNotEmpty
-              ? Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(24.0),
-                    child: Text(
-                      _errorMessage,
-                      textAlign: TextAlign.center,
-                      style: GoogleFonts.inter(color: Colors.red.shade700, fontWeight: FontWeight.bold),
-                    ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // CARD 1: SELECT STOCK COMPONENT (Photo 2)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(18),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: const Color(0xFFE2E8F0), width: 1.5),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF0F172A).withValues(alpha: 0.02),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
                   ),
-                )
-              : SafeArea(
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.all(16.0),
-                    child: Column(
-                      children: [
-                        // CARD 1: SELECT STOCK COMPONENT
-                        Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.all(20),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(color: const Color(0xFFE2E8F0), width: 1.5),
-                            boxShadow: [
-                              BoxShadow(
-                                color: const Color(0xFF0F172A).withOpacity(0.01),
-                                blurRadius: 10,
-                                offset: const Offset(0, 4),
-                              )
-                            ],
+                ],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Title and With/Without Variant Toggles
+                  Wrap(
+                    alignment: WrapAlignment.spaceBetween,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    spacing: 12,
+                    runSpacing: 8,
+                    children: [
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.layers_outlined, size: 16, color: Color(0xFF2563EB)),
+                          const SizedBox(width: 8),
+                          Text(
+                            "Select Stock Component",
+                            style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A)),
                           ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                children: [
-                                  Container(
-                                    padding: const EdgeInsets.all(6),
-                                    decoration: BoxDecoration(
-                                      color: const Color(0xFFEEF2FF),
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                    child: const Icon(Icons.widgets_outlined, color: Color(0xFF4F46E5), size: 18),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Text(
-                                    "Select Stock Component",
-                                    style: GoogleFonts.inter(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.bold,
-                                      color: const Color(0xFF0F172A),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 16),
-                              Text(
-                                "CHOOSE PRODUCT / STOCK ENTRY",
-                                style: GoogleFonts.inter(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w700,
-                                  color: const Color(0xFF94A3B8),
-                                  letterSpacing: 0.5,
-                                ),
-                              ),
-                              const SizedBox(height: 16),
-
-                              // STOCK NAME DROPDOWN
-                              Text(
-                                "STOCK NAME",
-                                style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.bold, color: const Color(0xFF64748B)),
-                              ),
-                              const SizedBox(height: 6),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 12),
-                                decoration: BoxDecoration(
-                                  borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(color: const Color(0xFFCBD5E1)),
-                                  color: const Color(0xFFF8FAFC),
-                                ),
-                                child: DropdownButtonHideUnderline(
-                                  child: DropdownButton<int>(
-                                    value: selectedStockId,
-                                    hint: Text("Select Product", style: GoogleFonts.inter(fontSize: 14)),
-                                    isExpanded: true,
-                                    items: () {
-                                      final seenIds = <int>{};
-                                      final list = <DropdownMenuItem<int>>[];
-                                      for (var item in _stocksList) {
-                                        if (item is! Map) continue;
-                                        final id = item['id'] ?? item['product_id'];
-                                        if (id == null || id is! int) continue;
-                                        if (seenIds.contains(id)) continue;
-                                        seenIds.add(id);
-                                        
-                                        final name = (item['product_name'] ?? item['name'] ?? 'Unnamed Product').toString();
-                                        list.add(DropdownMenuItem<int>(
-                                          value: id,
-                                          child: Text(name, style: GoogleFonts.inter(fontSize: 14)),
-                                        ));
-                                      }
-                                      return list;
-                                    }(),
-                                    onChanged: (val) {
-                                      setState(() {
-                                        Map<String, dynamic>? foundStock;
-                                        for (var item in _stocksList) {
-                                          if (item is Map && (item['id'] == val || item['product_id'] == val)) {
-                                            foundStock = Map<String, dynamic>.from(item);
-                                            break;
-                                          }
-                                        }
-                                        _selectedStock = foundStock;
-                                        _selectedVariant = null;
-                                        _selectedDist = null;
-                                      });
-                                    },
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(height: 16),
-
-                              // Row for Variant and Stock Dist
-                              Row(
-                                children: [
-                                  // VARIANT DROPDOWN
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          "VARIANT",
-                                          style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.bold, color: const Color(0xFF64748B)),
-                                        ),
-                                        const SizedBox(height: 6),
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 12),
-                                          decoration: BoxDecoration(
-                                            borderRadius: BorderRadius.circular(12),
-                                            border: Border.all(color: const Color(0xFFCBD5E1)),
-                                            color: const Color(0xFFF8FAFC),
-                                          ),
-                                          child: DropdownButtonHideUnderline(
-                                            child: DropdownButton<int>(
-                                              value: selectedVariantId,
-                                              hint: Text("Select Variant", style: GoogleFonts.inter(fontSize: 14)),
-                                              isExpanded: true,
-                                              items: () {
-                                                final seenIds = <int>{};
-                                                final list = <DropdownMenuItem<int>>[];
-                                                final variants = _getAvailableVariants();
-                                                for (var item in variants) {
-                                                  if (item is! Map) continue;
-                                                  final id = item['id'] ?? item['variant_id'];
-                                                  if (id == null || id is! int) continue;
-                                                  if (seenIds.contains(id)) continue;
-                                                  seenIds.add(id);
-                                                  
-                                                  final name = (item['name'] ?? item['variant_name'] ?? 'Unnamed').toString();
-                                                  
-                                                  // Read total quantity from stock entry variant
-                                                  final totalQty = item['qty'] ?? item['quantity'] ?? 0;
-                                                  list.add(DropdownMenuItem<int>(
-                                                    value: id,
-                                                    child: Text("$name ($totalQty)", style: GoogleFonts.inter(fontSize: 14)),
-                                                  ));
-                                                }
-                                                return list;
-                                              }(),
-                                              onChanged: _selectedStock == null
-                                                  ? null
-                                                  : (val) {
-                                                      setState(() {
-                                                        final variants = _getAvailableVariants();
-                                                        Map<String, dynamic>? foundVariant;
-                                                        for (var item in variants) {
-                                                          if (item is Map && (item['id'] == val || item['variant_id'] == val)) {
-                                                            foundVariant = Map<String, dynamic>.from(item);
-                                                            break;
-                                                          }
-                                                        }
-                                                        _selectedVariant = foundVariant;
-                                                        _selectedDist = null;
-                                                      });
-                                                    },
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  const SizedBox(width: 12),
-                                  // STOCK DIST DROPDOWN
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          "STOCK DIST",
-                                          style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.bold, color: const Color(0xFF64748B)),
-                                        ),
-                                        const SizedBox(height: 6),
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 12),
-                                          decoration: BoxDecoration(
-                                            borderRadius: BorderRadius.circular(12),
-                                            border: Border.all(color: const Color(0xFFCBD5E1)),
-                                            color: const Color(0xFFF8FAFC),
-                                          ),
-                                          child: DropdownButtonHideUnderline(
-                                            child: DropdownButton<String>(
-                                              value: _selectedDist,
-                                              hint: Text("Select Location", style: GoogleFonts.inter(fontSize: 14)),
-                                              isExpanded: true,
-                                              items: _getDistOptions().map((opt) {
-                                                return DropdownMenuItem<String>(
-                                                  value: opt['name'],
-                                                  child: Text(opt['label']!, style: GoogleFonts.inter(fontSize: 14)),
-                                                );
-                                              }).toList(),
-                                              onChanged: _selectedVariant == null
-                                                  ? null
-                                                  : (val) {
-                                                      setState(() {
-                                                        _selectedDist = val;
-                                                      });
-                                                    },
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
+                        ],
+                      ),
+                      Container(
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF1F5F9),
+                          borderRadius: BorderRadius.circular(6),
                         ),
-
-                        const SizedBox(height: 16),
-
-                        // CARD 2: DEFINE LOCATION PATH
-                        Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.all(20),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(color: const Color(0xFFE2E8F0), width: 1.5),
-                            boxShadow: [
-                              BoxShadow(
-                                color: const Color(0xFF0F172A).withOpacity(0.01),
-                                blurRadius: 10,
-                                offset: const Offset(0, 4),
-                              )
-                            ],
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                children: [
-                                  Container(
-                                    padding: const EdgeInsets.all(6),
-                                    decoration: BoxDecoration(
-                                      color: const Color(0xFFF5F3FF),
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                    child: const Icon(Icons.account_tree_outlined, color: Color(0xFF7C3AED), size: 18),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Text(
-                                    "Define Location Path",
-                                    style: GoogleFonts.inter(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.bold,
-                                      color: const Color(0xFF0F172A),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 20),
-
-                              if (_structureLevels.isEmpty)
-                                Padding(
-                                  padding: const EdgeInsets.all(12.0),
-                                  child: Center(
-                                    child: Text(
-                                      "No structures defined for this storage type.",
-                                      style: GoogleFonts.inter(color: Colors.grey, fontSize: 13),
-                                    ),
-                                  ),
-                                )
-                              else
-                                GridView.builder(
-                                  shrinkWrap: true,
-                                  physics: const NeverScrollableScrollPhysics(),
-                                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                                    crossAxisCount: 2,
-                                    mainAxisSpacing: 16,
-                                    crossAxisSpacing: 12,
-                                    childAspectRatio: 2.1,
-                                  ),
-                                  itemCount: _structureLevels.length,
-                                  itemBuilder: (context, idx) {
-                                    final level = _structureLevels[idx];
-                                    final String name = (level['name'] ?? 'Level').toString();
-                                    final int order = level['level_order'] ?? (idx + 1);
-                                    final int? levelId = level['id'];
-
-                                    final selectedVal = _selectedLocations[order];
-                                    final options = _getLocationDropdownOptions(order, levelId);
-
-                                    // Capitalize level name
-                                    final String formattedLabel = name.isNotEmpty
-                                        ? '${name[0].toUpperCase()}${name.substring(1)}'
-                                        : 'Level';
-
-                                    // Check if previous dropdown has selection (except for level 1)
-                                    final bool isEnabled = order == 1 || _selectedLocations[order - 1] != null;
-
-                                    return Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          formattedLabel,
-                                          style: GoogleFonts.inter(
-                                            fontSize: 11,
-                                            fontWeight: FontWeight.bold,
-                                            color: isEnabled ? const Color(0xFF64748B) : const Color(0xFFCBD5E1),
-                                          ),
-                                        ),
-                                        const SizedBox(height: 6),
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 10),
-                                          decoration: BoxDecoration(
-                                            borderRadius: BorderRadius.circular(12),
-                                            border: Border.all(
-                                              color: isEnabled ? const Color(0xFFCBD5E1) : const Color(0xFFE2E8F0),
-                                            ),
-                                            color: isEnabled ? const Color(0xFFF8FAFC) : const Color(0xFFF1F5F9),
-                                          ),
-                                          child: DropdownButtonHideUnderline(
-                                            child: DropdownButton<int>(
-                                              value: selectedVal != null ? selectedVal['id'] as int? : null,
-                                              disabledHint: Text("Select $formattedLabel", style: GoogleFonts.inter(fontSize: 13, color: const Color(0xFF94A3B8))),
-                                              hint: Text("Select $formattedLabel", style: GoogleFonts.inter(fontSize: 13)),
-                                              isExpanded: true,
-                                              items: isEnabled
-                                                  ? () {
-                                                      final seenIds = <int>{};
-                                                      final list = <DropdownMenuItem<int>>[];
-                                                      for (var opt in options) {
-                                                        final id = opt['id'];
-                                                        if (id == null || id is! int) continue;
-                                                        if (seenIds.contains(id)) continue;
-                                                        seenIds.add(id);
-                                                        
-                                                        list.add(DropdownMenuItem<int>(
-                                                          value: id,
-                                                          child: Text(opt['name'].toString(), style: GoogleFonts.inter(fontSize: 13)),
-                                                        ));
-                                                      }
-                                                      return list;
-                                                    }()
-                                                  : [],
-                                              onChanged: isEnabled
-                                                  ? (val) {
-                                                      setState(() {
-                                                        Map<String, dynamic>? foundLoc;
-                                                        for (var opt in options) {
-                                                          if (opt['id'] == val) {
-                                                            foundLoc = opt;
-                                                            break;
-                                                          }
-                                                        }
-                                                        _selectedLocations[order] = foundLoc;
-                                                        // Clear selected partition when location changes
-                                                        _selectedPartition = null;
-                                                        // Clear all cascading lower levels
-                                                        for (int o = order + 1; o <= _structureLevels.length; o++) {
-                                                          _selectedLocations[o] = null;
-                                                        }
-                                                      });
-                                                    }
-                                                  : null,
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    );
-                                  },
-                                ),
-                            ],
-                          ),
-                        ),
-
-                        const SizedBox(height: 16),
-
-                        // DYNAMIC SELECTED BOX DETAILS (PARTITIONS SECTION)
-                        if (hasPartitions && leafBox != null)
-                          Container(
-                            width: double.infinity,
-                            padding: const EdgeInsets.all(20),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(16),
-                              border: Border.all(color: const Color(0xFFE2E8F0), width: 1.5),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: const Color(0xFF0F172A).withOpacity(0.01),
-                                  blurRadius: 10,
-                                  offset: const Offset(0, 4),
-                                )
-                              ],
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  children: [
-                                    Container(
-                                      padding: const EdgeInsets.all(6),
-                                      decoration: BoxDecoration(
-                                        color: const Color(0xFFF0FDF4),
-                                        borderRadius: BorderRadius.circular(8),
-                                      ),
-                                      child: const Icon(Icons.grid_view_rounded, color: Color(0xFF16A34A), size: 18),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Expanded(
-                                      child: Text(
-                                        "Selected Box Details - ${leafBox['name']}",
-                                        style: GoogleFonts.inter(
-                                          fontSize: 15,
-                                          fontWeight: FontWeight.bold,
-                                          color: const Color(0xFF0F172A),
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 16),
-                                Wrap(
-                                  spacing: 8,
-                                  runSpacing: 8,
-                                  children: partitionList.map((part) {
-                                    final bool isSelected = _selectedPartition == part;
-                                    return GestureDetector(
-                                      onTap: () {
-                                        setState(() {
-                                          _selectedPartition = part;
-                                        });
-                                      },
-                                      child: Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                                        decoration: BoxDecoration(
-                                          color: isSelected ? const Color(0xFFEEF2FF) : const Color(0xFFF8FAFC),
-                                          borderRadius: BorderRadius.circular(10),
-                                          border: Border.all(
-                                            color: isSelected ? const Color(0xFF4F46E5) : const Color(0xFFE2E8F0),
-                                            width: isSelected ? 2.0 : 1.5,
-                                          ),
-                                        ),
-                                        child: Text(
-                                          part,
-                                          style: GoogleFonts.inter(
-                                            fontSize: 13,
-                                            fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                                            color: isSelected ? const Color(0xFF4F46E5) : const Color(0xFF64748B),
-                                          ),
-                                        ),
-                                      ),
-                                    );
-                                  }).toList(),
-                                ),
-                              ],
-                            ),
-                          ),
-
-                        const SizedBox(height: 32),
-
-                        // CANCEL & SAVE BUTTONS ROW
-                        Row(
+                        padding: const EdgeInsets.all(2),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
                           children: [
-                            Expanded(
-                              child: OutlinedButton(
-                                style: OutlinedButton.styleFrom(
-                                  side: const BorderSide(color: Color(0xFFCBD5E1), width: 1.5),
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                  padding: const EdgeInsets.symmetric(vertical: 14),
+                            GestureDetector(
+                              onTap: () => setState(() => isWithVariant = true),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: isWithVariant ? Colors.white : Colors.transparent,
+                                  borderRadius: BorderRadius.circular(4),
                                 ),
-                                onPressed: () => Navigator.pop(context),
                                 child: Text(
-                                  "Cancel",
+                                  "With Variant",
                                   style: GoogleFonts.inter(
-                                    fontSize: 14,
+                                    fontSize: 10,
                                     fontWeight: FontWeight.bold,
-                                    color: const Color(0xFF475569),
+                                    color: isWithVariant ? const Color(0xFF2563EB) : const Color(0xFF64748B),
                                   ),
                                 ),
                               ),
                             ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: ElevatedButton(
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: const Color(0xFF4F46E5),
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                  padding: const EdgeInsets.symmetric(vertical: 14),
-                                  elevation: 0,
+                            GestureDetector(
+                              onTap: () => setState(() => isWithVariant = false),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: !isWithVariant ? Colors.white : Colors.transparent,
+                                  borderRadius: BorderRadius.circular(4),
                                 ),
-                                onPressed: _saveAllocation,
                                 child: Text(
-                                  "Save Allocation",
+                                  "Without Variant",
                                   style: GoogleFonts.inter(
-                                    fontSize: 14,
+                                    fontSize: 10,
                                     fontWeight: FontWeight.bold,
-                                    color: Colors.white,
+                                    color: !isWithVariant ? const Color(0xFF2563EB) : const Color(0xFF64748B),
                                   ),
                                 ),
                               ),
                             ),
                           ],
                         ),
-                        const SizedBox(height: 80),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+
+                  Text(
+                    "CHOOSE PRODUCT / STOCK ENTRY",
+                    style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w700, color: const Color(0xFF94A3B8), letterSpacing: 0.5),
+                  ),
+                  const SizedBox(height: 14),
+
+                  // 3 Dropdown Fields: Stock Name, Variant, Stock Dist (Photo 2)
+                  LayoutBuilder(
+                    builder: (context, constraints) {
+                      final isNarrow = constraints.maxWidth < 600;
+
+                      final stockField = _buildDropdownField(
+                        label: "STOCK NAME",
+                        value: selectedStockName,
+                        items: stockNameOptions,
+                        onChanged: (val) {
+                          if (val != null) setState(() => selectedStockName = val);
+                        },
+                      );
+
+                      final variantField = _buildDropdownField(
+                        label: "VARIANT",
+                        value: selectedVariant,
+                        items: variantOptions,
+                        onChanged: (val) {
+                          if (val != null) setState(() => selectedVariant = val);
+                        },
+                      );
+
+                      final distField = _buildDropdownField(
+                        label: "STOCK DIST",
+                        value: selectedStockDist,
+                        items: stockDistOptions,
+                        onChanged: (val) {
+                          if (val != null) setState(() => selectedStockDist = val);
+                        },
+                      );
+
+                      if (isNarrow) {
+                        return Column(
+                          children: [
+                            stockField,
+                            const SizedBox(height: 12),
+                            variantField,
+                            const SizedBox(height: 12),
+                            distField,
+                          ],
+                        );
+                      }
+
+                      return Row(
+                        children: [
+                          Expanded(child: stockField),
+                          const SizedBox(width: 12),
+                          Expanded(child: variantField),
+                          const SizedBox(width: 12),
+                          Expanded(child: distField),
+                        ],
+                      );
+                    },
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
+
+            // CARD 2: CHOOSE STORAGE TYPE (Photo 2)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(18),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: const Color(0xFFE2E8F0), width: 1.5),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF0F172A).withValues(alpha: 0.02),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Section Header
+                  Row(
+                    children: [
+                      const Icon(Icons.storefront_outlined, size: 16, color: Color(0xFF2563EB)),
+                      const SizedBox(width: 8),
+                      Text(
+                        "Choose Storage Type",
+                        style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A)),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+
+                  // Yellow Previous Configuration Banner (Photo 2)
+                  if (showPreviousConfig)
+                    Container(
+                      width: double.infinity,
+                      margin: const EdgeInsets.only(bottom: 16),
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFFFBEB),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: const Color(0xFFFDE68A)),
+                      ),
+                      child: Wrap(
+                        alignment: WrapAlignment.spaceBetween,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.info_outline, size: 14, color: Color(0xFFD97706)),
+                              const SizedBox(width: 6),
+                              Text(
+                                "PREVIOUS CONFIGURATION:",
+                                style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.bold, color: const Color(0xFF92400E)),
+                              ),
+                            ],
+                          ),
+                          Wrap(
+                            spacing: 4,
+                            runSpacing: 4,
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            children: previousConfigParts.asMap().entries.map((entry) {
+                              final idx = entry.key;
+                              final part = entry.value;
+
+                              return Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white,
+                                      borderRadius: BorderRadius.circular(6),
+                                      border: Border.all(color: const Color(0xFFFCD34D)),
+                                    ),
+                                    child: Text(part, style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.bold, color: const Color(0xFF92400E))),
+                                  ),
+                                  if (idx < previousConfigParts.length - 1)
+                                    const Padding(
+                                      padding: EdgeInsets.symmetric(horizontal: 4),
+                                      child: Icon(Icons.chevron_right, size: 12, color: Color(0xFFD97706)),
+                                    ),
+                                ],
+                              );
+                            }).toList(),
+                          ),
+                          InkWell(
+                            onTap: () => setState(() => showPreviousConfig = false),
+                            child: Padding(
+                              padding: const EdgeInsets.all(4.0),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(Icons.close, size: 12, color: Color(0xFF92400E)),
+                                  const SizedBox(width: 2),
+                                  Text("Clear", style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.bold, color: const Color(0xFF92400E))),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                  Text(
+                    "1. Choose Storage Type",
+                    style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.bold, color: const Color(0xFF64748B)),
+                  ),
+                  const SizedBox(height: 10),
+
+                  // Selected Storage Type Card (Photo 2)
+                  Container(
+                    width: 130,
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFEFF6FF),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: const Color(0xFF2563EB), width: 1.5),
+                    ),
+                    child: Column(
+                      children: [
+                        Container(
+                          width: 38,
+                          height: 38,
+                          decoration: const BoxDecoration(
+                            color: Color(0xFF2563EB),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(Icons.dns_rounded, color: Colors.white, size: 20),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          widget.storageTypeName,
+                          style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A)),
+                          textAlign: TextAlign.center,
+                        ),
                       ],
                     ),
                   ),
-                ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
+
+            // CARD 3: DEFINE LOCATION PATH (Photo 2)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(18),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: const Color(0xFFE2E8F0), width: 1.5),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF0F172A).withValues(alpha: 0.02),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.account_tree_outlined, size: 16, color: Color(0xFF2563EB)),
+                      const SizedBox(width: 8),
+                      Text(
+                        "Define Location Path",
+                        style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A)),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 18),
+
+                  // 2-Column Responsive Grid for Hierarchy Levels
+                  LayoutBuilder(
+                    builder: (context, constraints) {
+                      final isNarrow = constraints.maxWidth < 550;
+
+                      final buildingField = _buildDropdownField(
+                        label: "Building",
+                        value: selectedBuilding,
+                        items: buildingOptions,
+                        onChanged: (val) {
+                          if (val != null) setState(() => selectedBuilding = val);
+                        },
+                      );
+
+                      final floorField = _buildDropdownField(
+                        label: "Floor",
+                        value: selectedFloor,
+                        items: floorOptions,
+                        onChanged: (val) {
+                          if (val != null) setState(() => selectedFloor = val);
+                        },
+                      );
+
+                      final rackField = _buildDropdownField(
+                        label: "Rack",
+                        value: selectedRack,
+                        items: rackOptions,
+                        onChanged: (val) {
+                          if (val != null) setState(() => selectedRack = val);
+                        },
+                      );
+
+                      final shelfField = _buildDropdownField(
+                        label: "Shelf",
+                        value: selectedShelf,
+                        items: shelfOptions,
+                        onChanged: (val) {
+                          if (val != null) setState(() => selectedShelf = val);
+                        },
+                      );
+
+                      final boxField = _buildDropdownField(
+                        label: "Box",
+                        value: selectedBox,
+                        items: boxOptions,
+                        onChanged: (val) {
+                          if (val != null) setState(() => selectedBox = val);
+                        },
+                      );
+
+                      final containerField = _buildDropdownField(
+                        label: "Container",
+                        value: selectedContainer,
+                        items: containerOptions,
+                        onChanged: (val) {
+                          if (val != null) setState(() => selectedContainer = val);
+                        },
+                      );
+
+                      if (isNarrow) {
+                        return Column(
+                          children: [
+                            buildingField,
+                            const SizedBox(height: 12),
+                            floorField,
+                            const SizedBox(height: 12),
+                            rackField,
+                            const SizedBox(height: 12),
+                            shelfField,
+                            const SizedBox(height: 12),
+                            boxField,
+                            const SizedBox(height: 12),
+                            containerField,
+                          ],
+                        );
+                      }
+
+                      return Column(
+                        children: [
+                          Row(
+                            children: [
+                              Expanded(child: buildingField),
+                              const SizedBox(width: 14),
+                              Expanded(child: floorField),
+                            ],
+                          ),
+                          const SizedBox(height: 14),
+                          Row(
+                            children: [
+                              Expanded(child: rackField),
+                              const SizedBox(width: 14),
+                              Expanded(child: shelfField),
+                            ],
+                          ),
+                          const SizedBox(height: 14),
+                          Row(
+                            children: [
+                              Expanded(child: boxField),
+                              const SizedBox(width: 14),
+                              Expanded(child: containerField),
+                            ],
+                          ),
+                        ],
+                      );
+                    },
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Bottom Notice (Photo 2)
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFEFF6FF),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: const Color(0xFFBFDBFE)),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.info_outline, size: 14, color: Color(0xFF2563EB)),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            "Assigning drawers from SA12-DiodeBox",
+                            style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF1E40AF)),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+
+                  // Cancel & Save Allocation Buttons (Photo 2)
+                  Wrap(
+                    alignment: WrapAlignment.end,
+                    spacing: 12,
+                    runSpacing: 10,
+                    children: [
+                      OutlinedButton(
+                        onPressed: () => Navigator.pop(context),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: const Color(0xFF64748B),
+                          side: const BorderSide(color: Color(0xFFCBD5E1)),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                        ),
+                        child: Text("Cancel", style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold)),
+                      ),
+                      ElevatedButton(
+                        onPressed: _saveAllocation,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF2563EB),
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                        ),
+                        child: Text("Save Allocation", style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold)),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDropdownField({
+    required String label,
+    required String value,
+    required List<String> items,
+    required ValueChanged<String?> onChanged,
+  }) {
+    final effectiveItems = items.contains(value) ? items : [value, ...items];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.bold, color: const Color(0xFF64748B)),
+        ),
+        const SizedBox(height: 6),
+        Container(
+          height: 42,
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF8FAFC),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: const Color(0xFFCBD5E1)),
+          ),
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<String>(
+              value: value,
+              isExpanded: true,
+              style: GoogleFonts.inter(fontSize: 13, color: const Color(0xFF0F172A)),
+              items: effectiveItems.map((opt) {
+                return DropdownMenuItem<String>(
+                  value: opt,
+                  child: Text(opt, overflow: TextOverflow.ellipsis),
+                );
+              }).toList(),
+              onChanged: onChanged,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

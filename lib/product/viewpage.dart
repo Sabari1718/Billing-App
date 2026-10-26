@@ -1,8 +1,11 @@
 import 'dart:convert';
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:billingapp/utils/app_logger.dart';
+import 'add product.dart';
 
 part 'viewpage_logic.dart';
 
@@ -10,353 +13,149 @@ class ProductAllocationPage extends StatefulWidget {
   const ProductAllocationPage({super.key});
 
   @override
-  State<ProductAllocationPage> createState() =>
-      _ProductAllocationPageState();
+  State<ProductAllocationPage> createState() => _ProductAllocationPageState();
 }
 
 class _ProductAllocationPageState extends State<ProductAllocationPage> with ProductAllocationLogic {
-  
-  // ✅ EDIT POPUP
-  void showEditDialog(Map item) {
-    TextEditingController name = TextEditingController(text: item['name']);
-    TextEditingController min = TextEditingController(text: item['min'].toString());
-    TextEditingController max = TextEditingController(text: item['max'].toString());
+  final TextEditingController searchController = TextEditingController();
+  final TextEditingController pageInputController = TextEditingController(text: "1");
 
-    showDialog(
-      context: context,
-      builder: (_) => Dialog(
-        backgroundColor: Colors.transparent,
-        insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
-        child: Container(
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(24),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.1),
-                blurRadius: 20,
-                offset: const Offset(0, 10),
-              )
-            ],
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
-                decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.primary.withOpacity(0.05),
-                  borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-                ),
-                child: Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: Theme.of(context).colorScheme.primary.withOpacity(0.15),
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(Icons.edit_note_rounded, color: Theme.of(context).colorScheme.primary),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Text(
-                        "Update Product",
-                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: -0.5,
-                            ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.all(24),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    TextField(
-                      controller: name,
-                      style: const TextStyle(fontWeight: FontWeight.w500),
-                      decoration: InputDecoration(
-                        labelText: "Product Name",
-                        labelStyle: TextStyle(color: Colors.grey.shade600),
-                        filled: true,
-                        fillColor: Colors.grey.shade50,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(16),
-                          borderSide: BorderSide(color: Colors.grey.shade200),
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(16),
-                          borderSide: BorderSide(color: Colors.grey.shade200),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(16),
-                          borderSide: BorderSide(color: Theme.of(context).colorScheme.primary, width: 2),
-                        ),
-                        prefixIcon: const Icon(Icons.inventory_2_outlined),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: TextField(
-                            controller: min,
-                            keyboardType: TextInputType.number,
-                            style: const TextStyle(fontWeight: FontWeight.w600),
-                            decoration: InputDecoration(
-                              labelText: "Min Qty",
-                              labelStyle: TextStyle(color: Colors.grey.shade600),
-                              filled: true,
-                              fillColor: Colors.grey.shade50,
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(16),
-                                borderSide: BorderSide(color: Colors.grey.shade200),
-                              ),
-                              enabledBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(16),
-                                borderSide: BorderSide(color: Colors.grey.shade200),
-                              ),
-                              focusedBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(16),
-                                borderSide: BorderSide(color: Theme.of(context).colorScheme.primary, width: 2),
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: TextField(
-                            controller: max,
-                            keyboardType: TextInputType.number,
-                            style: const TextStyle(fontWeight: FontWeight.w600),
-                            decoration: InputDecoration(
-                              labelText: "Max Qty",
-                              labelStyle: TextStyle(color: Colors.grey.shade600),
-                              filled: true,
-                              fillColor: Colors.grey.shade50,
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(16),
-                                borderSide: BorderSide(color: Colors.grey.shade200),
-                              ),
-                              enabledBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(16),
-                                borderSide: BorderSide(color: Colors.grey.shade200),
-                              ),
-                              focusedBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(16),
-                                borderSide: BorderSide(color: Theme.of(context).colorScheme.primary, width: 2),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 32),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: TextButton(
-                            onPressed: () => Navigator.pop(context),
-                            style: TextButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(vertical: 16),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                            ),
-                            child: Text(
-                              "Cancel",
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.grey.shade600,
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: ElevatedButton(
-                            onPressed: () {
-                              updateProduct(
-                                item['id'],
-                                item['category_group_id'] ?? 0,
-                                item['category_id'] ?? 0,
-                                item['brand_id'] ?? 0,
-                                name.text,
-                                min.text,
-                                max.text,
-                              );
-                            },
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Theme.of(context).colorScheme.primary,
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(vertical: 16),
-                              elevation: 0,
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                            ),
-                            child: const Text(
-                              "Update",
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
+  String searchQuery = "";
+  int pageSize = 10;
+  int currentPage = 1;
+  final List<int> pageSizeOptions = [10, 25, 50, 100, 250, 500, 1000];
+
+  @override
+  void dispose() {
+    searchController.dispose();
+    pageInputController.dispose();
+    super.dispose();
   }
 
-  // 🎨 SMALL UI HELPERS
-  void confirmDeleteDialog(int id) {
-    showDialog(
-      context: context,
-      builder: (_) => Dialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.red.shade50,
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(Icons.warning_amber_rounded, size: 40, color: Colors.red.shade600),
-              ),
-              const SizedBox(height: 20),
-              const Text(
-                "Delete Product?",
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 12),
-              Text(
-                "Are you sure you want to delete this product allocation? This action cannot be undone.",
-                textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.grey.shade600, height: 1.5),
-              ),
-              const SizedBox(height: 24),
-              Row(
-                children: [
-                  Expanded(
-                    child: TextButton(
-                      onPressed: () => Navigator.pop(context),
-                      style: TextButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                      ),
-                      child: Text("Cancel", style: TextStyle(color: Colors.grey.shade600, fontWeight: FontWeight.bold)),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: () {
-                        Navigator.pop(context);
-                        deleteProduct(id);
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.red.shade600,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        elevation: 0,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                      ),
-                      child: const Text("Delete", style: TextStyle(fontWeight: FontWeight.bold)),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
+  List get filteredProducts {
+    if (searchQuery.trim().isEmpty) return products;
+    final q = searchQuery.toLowerCase().trim();
+    return products.where((p) {
+      final name = (p['name'] ?? "").toString().toLowerCase();
+      final code = (p['code'] ?? "").toString().toLowerCase();
+      final id = (p['id'] ?? "").toString();
+      return name.contains(q) || code.contains(q) || id.contains(q);
+    }).toList();
   }
 
-  Widget qtyBox(String title, dynamic value) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: BoxDecoration(
-        color: Colors.grey.shade50,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.shade200),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(title, style: TextStyle(fontSize: 11, color: Colors.grey.shade500, fontWeight: FontWeight.w600, letterSpacing: 0.5)),
-          const SizedBox(height: 4),
-          Text("\$value", style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16, color: Colors.black87)),
+  int get totalPages {
+    final len = filteredProducts.length;
+    if (len == 0) return 1;
+    return (len / pageSize).ceil();
+  }
+
+  List get pagedProducts {
+    final list = filteredProducts;
+    final startIndex = (currentPage - 1) * pageSize;
+    if (startIndex >= list.length) return [];
+    final endIndex = (startIndex + pageSize) > list.length ? list.length : startIndex + pageSize;
+    return list.sublist(startIndex, endIndex);
+  }
+
+  void goToPage(int page) {
+    if (page < 1) page = 1;
+    if (page > totalPages) page = totalPages;
+    setState(() {
+      currentPage = page;
+      pageInputController.text = page.toString();
+    });
+  }
+
+  void confirmDeleteDialog(Map item) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text(
+          "Delete Product",
+          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+        ),
+        content: Text(
+          "Are you sure you want to delete ${item['name'] ?? 'this product'}?",
+          style: TextStyle(color: Colors.grey.shade700, fontSize: 14),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(
+              "Cancel",
+              style: TextStyle(color: Colors.grey.shade600, fontWeight: FontWeight.bold),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              deleteProduct(item['id']);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFEF4444),
+              foregroundColor: Colors.white,
+              elevation: 0,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            child: const Text("OK", style: TextStyle(fontWeight: FontWeight.bold)),
+          ),
         ],
       ),
     );
   }
 
-  Widget actionBtn(IconData icon, Color color, VoidCallback onTap, String tooltip) {
-    return Tooltip(
-      message: tooltip,
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(12),
-          splashColor: color.withOpacity(0.1),
-          highlightColor: color.withOpacity(0.05),
-          child: Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: color.withOpacity(0.05),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: color.withOpacity(0.1)),
-            ),
-            child: Icon(icon, color: color, size: 22),
-          ),
-        ),
+  void editProduct(Map item) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ProductEntryPage(editItem: Map<String, dynamic>.from(item)),
       ),
-    );
+    ).then((_) {
+      fetchProducts();
+    });
   }
 
-  // ✅ UI
   @override
   Widget build(BuildContext context) {
+    final totalEntries = filteredProducts.length;
+    final startEntry = totalEntries == 0 ? 0 : ((currentPage - 1) * pageSize) + 1;
+    final endEntry = min(currentPage * pageSize, totalEntries);
+    final displayedItems = pagedProducts;
+
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC), // Modern slate-50 background
+      backgroundColor: const Color(0xFFF1F5F9), // Light background like web
       appBar: AppBar(
-        title: const Text(
-          "Allocated Products",
-          style: TextStyle(fontWeight: FontWeight.w800, letterSpacing: -0.5, fontSize: 22),
-        ),
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black87,
-        elevation: 0,
-        centerTitle: false,
-        actions: [
-          Container(
-            margin: const EdgeInsets.only(right: 12),
-            child: IconButton(
-              icon: const Icon(Icons.sync_rounded),
-              tooltip: "Refresh List",
-              onPressed: fetchProducts,
-              style: IconButton.styleFrom(
-                backgroundColor: Theme.of(context).colorScheme.primary.withOpacity(0.05),
-                foregroundColor: Theme.of(context).colorScheme.primary,
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                color: const Color(0xFF2563EB).withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Icon(Icons.inventory_2_outlined, color: Color(0xFF2563EB), size: 20),
+            ),
+            const SizedBox(width: 10),
+            Text(
+              "Product List",
+              style: GoogleFonts.inter(
+                fontWeight: FontWeight.w700,
+                fontSize: 18,
+                color: const Color(0xFF0F172A),
               ),
             ),
-          )
+          ],
+        ),
+        backgroundColor: Colors.white,
+        elevation: 0,
+        foregroundColor: const Color(0xFF0F172A),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh_rounded),
+            tooltip: "Refresh List",
+            onPressed: fetchProducts,
+          ),
         ],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(1),
@@ -365,179 +164,550 @@ class _ProductAllocationPageState extends State<ProductAllocationPage> with Prod
       ),
       body: RefreshIndicator(
         onRefresh: fetchProducts,
-        color: Theme.of(context).colorScheme.primary,
-        backgroundColor: Colors.white,
+        color: const Color(0xFF2563EB),
         child: isLoading
-            ? Center(
+            ? const Center(child: CircularProgressIndicator())
+            : SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.all(16),
                 child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    CircularProgressIndicator(strokeWidth: 3, color: Theme.of(context).colorScheme.primary),
-                    const SizedBox(height: 24),
-                    Text(
-                      "Loading products...",
-                      style: TextStyle(color: Colors.grey.shade500, fontSize: 16, fontWeight: FontWeight.w500),
-                    )
-                  ],
-                ),
-              )
-            : products.isEmpty
-            ? Center(
-                child: SingleChildScrollView(
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(24),
-                        decoration: BoxDecoration(
-                          color: Theme.of(context).colorScheme.primary.withOpacity(0.05),
-                          shape: BoxShape.circle,
-                        ),
-                        child: Icon(
-                          Icons.inventory_2_rounded,
-                          size: 72,
-                          color: Theme.of(context).colorScheme.primary.withOpacity(0.5),
-                        ),
+                    // Main White Card Container
+                    Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: Colors.grey.shade200),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.02),
+                            blurRadius: 10,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
                       ),
-                      const SizedBox(height: 24),
-                      Text(
-                        "No products found",
-                        style: TextStyle(
-                          color: Colors.grey.shade800,
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: -0.5,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        "Allocated products will appear here.\nPull down to refresh.",
-                        textAlign: TextAlign.center,
-                        style: TextStyle(color: Colors.grey.shade500, fontSize: 15, height: 1.5),
-                      ),
-                    ],
-                  ),
-                ),
-              )
-            : ListView.builder(
-                padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
-                physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
-                itemCount: products.length,
-                itemBuilder: (context, index) {
-                  final item = products[index];
-
-                  return Container(
-                    margin: const EdgeInsets.only(bottom: 16),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: Colors.grey.shade200),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.03),
-                          blurRadius: 10,
-                          offset: const Offset(0, 4),
-                        )
-                      ],
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.all(20),
                       child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.all(12),
-                                decoration: BoxDecoration(
-                                  color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
-                                  borderRadius: BorderRadius.circular(16),
+                          // 1. Header with Title & Icon
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
+                            child: Row(
+                              children: [
+                                const Icon(Icons.view_in_ar_rounded, color: Color(0xFF3B82F6), size: 24),
+                                const SizedBox(width: 8),
+                                Text(
+                                  "Product List",
+                                  style: GoogleFonts.inter(
+                                    fontSize: 17,
+                                    fontWeight: FontWeight.w800,
+                                    color: const Color(0xFF1E293B),
+                                  ),
                                 ),
-                                child: Icon(Icons.widgets_rounded, color: Theme.of(context).colorScheme.primary, size: 24),
-                              ),
-                              const SizedBox(width: 16),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
+                              ],
+                            ),
+                          ),
+
+                          const Divider(height: 1, thickness: 1, color: Color(0xFFF1F5F9)),
+
+                          // 2. Search & Show Filter Bar
+                          Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: LayoutBuilder(
+                              builder: (context, constraints) {
+                                final isSmall = constraints.maxWidth < 500;
+                                if (isSmall) {
+                                  return Column(
+                                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                                    children: [
+                                      _buildSearchField(),
+                                      const SizedBox(height: 12),
+                                      _buildShowDropdown(),
+                                    ],
+                                  );
+                                }
+                                return Row(
+                                  crossAxisAlignment: CrossAxisAlignment.end,
                                   children: [
-                                    Text(
-                                      item['name'],
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 17,
-                                        color: Colors.black87,
-                                        letterSpacing: -0.5,
-                                        height: 1.3,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 4),
-                                    Text(
-                                      "Allocation ID: \${item['id']}",
-                                      style: TextStyle(
-                                        fontSize: 13,
-                                        color: Colors.grey.shade500,
-                                        fontWeight: FontWeight.w500,
-                                      ),
-                                    ),
+                                    Expanded(child: _buildSearchField()),
+                                    const SizedBox(width: 16),
+                                    _buildShowDropdown(),
                                   ],
-                                ),
-                              ),
-                            ],
+                                );
+                              },
+                            ),
                           ),
-                          const SizedBox(height: 20),
-                          Row(
-                            children: [
-                              Expanded(child: qtyBox("MIN QTY", item['min'] ?? 0)),
-                              const SizedBox(width: 12),
-                              Expanded(child: qtyBox("MAX QTY", item['max'] ?? 0)),
-                            ],
-                          ),
-                          const SizedBox(height: 20),
-                          Container(
-                            height: 1,
-                            color: Colors.grey.shade100,
-                          ),
-                          const SizedBox(height: 16),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.end,
-                            children: [
-                              Expanded(
-                                child: OutlinedButton.icon(
-                                  onPressed: () => showEditDialog(item),
-                                  icon: Icon(Icons.edit_rounded, size: 18, color: Theme.of(context).colorScheme.primary),
-                                  label: Text("Edit", style: TextStyle(color: Theme.of(context).colorScheme.primary, fontWeight: FontWeight.w600)),
-                                  style: OutlinedButton.styleFrom(
-                                    padding: const EdgeInsets.symmetric(vertical: 12),
-                                    side: BorderSide(color: Theme.of(context).colorScheme.primary.withOpacity(0.3)),
-                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+
+                          const Divider(height: 1, thickness: 1, color: Color(0xFFF1F5F9)),
+
+                          // 3. Data Table (Horizontally scrollable to eliminate any overflow)
+                          SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            child: ConstrainedBox(
+                              constraints: const BoxConstraints(minWidth: 700),
+                              child: DataTable(
+                                headingRowColor: WidgetStateProperty.all(const Color(0xFFF8FAFC)),
+                                dataRowMinHeight: 52,
+                                dataRowMaxHeight: 52,
+                                headingRowHeight: 44,
+                                horizontalMargin: 20,
+                                columnSpacing: 24,
+                                columns: [
+                                  DataColumn(
+                                    label: Text(
+                                      "S.NO",
+                                      style: GoogleFonts.inter(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.bold,
+                                        color: const Color(0xFF64748B),
+                                        letterSpacing: 0.5,
+                                      ),
+                                    ),
                                   ),
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: OutlinedButton.icon(
-                                  onPressed: () => confirmDeleteDialog(item['id']),
-                                  icon: Icon(Icons.delete_outline_rounded, size: 18, color: Colors.red.shade600),
-                                  label: Text("Delete", style: TextStyle(color: Colors.red.shade600, fontWeight: FontWeight.w600)),
-                                  style: OutlinedButton.styleFrom(
-                                    padding: const EdgeInsets.symmetric(vertical: 12),
-                                    side: BorderSide(color: Colors.red.shade200),
-                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                    backgroundColor: Colors.red.shade50,
+                                  DataColumn(
+                                    label: Text(
+                                      "PRODUCT CODE",
+                                      style: GoogleFonts.inter(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.bold,
+                                        color: const Color(0xFF64748B),
+                                        letterSpacing: 0.5,
+                                      ),
+                                    ),
                                   ),
-                                ),
+                                  DataColumn(
+                                    label: Text(
+                                      "PRODUCT NAME",
+                                      style: GoogleFonts.inter(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.bold,
+                                        color: const Color(0xFF64748B),
+                                        letterSpacing: 0.5,
+                                      ),
+                                    ),
+                                  ),
+                                  DataColumn(
+                                    label: Text(
+                                      "MIN QTY",
+                                      style: GoogleFonts.inter(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.bold,
+                                        color: const Color(0xFF64748B),
+                                        letterSpacing: 0.5,
+                                      ),
+                                    ),
+                                  ),
+                                  DataColumn(
+                                    label: Text(
+                                      "MAX QTY",
+                                      style: GoogleFonts.inter(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.bold,
+                                        color: const Color(0xFF64748B),
+                                        letterSpacing: 0.5,
+                                      ),
+                                    ),
+                                  ),
+                                  DataColumn(
+                                    label: Text(
+                                      "ACTIONS",
+                                      style: GoogleFonts.inter(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.bold,
+                                        color: const Color(0xFF64748B),
+                                        letterSpacing: 0.5,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                                rows: displayedItems.isEmpty
+                                    ? [
+                                        DataRow(
+                                          cells: [
+                                            DataCell(Text("-", style: GoogleFonts.inter(color: Colors.grey))),
+                                            DataCell(Text("-", style: GoogleFonts.inter(color: Colors.grey))),
+                                            DataCell(
+                                              Text(
+                                                "No products match your search",
+                                                style: GoogleFonts.inter(color: Colors.grey.shade500),
+                                              ),
+                                            ),
+                                            DataCell(Text("-", style: GoogleFonts.inter(color: Colors.grey))),
+                                            DataCell(Text("-", style: GoogleFonts.inter(color: Colors.grey))),
+                                            DataCell(Text("-", style: GoogleFonts.inter(color: Colors.grey))),
+                                          ],
+                                        )
+                                      ]
+                                    : List.generate(displayedItems.length, (index) {
+                                        final item = displayedItems[index];
+                                        final serialNo = ((currentPage - 1) * pageSize) + index + 1;
+                                        final code = item['code'] ?? "-";
+
+                                        return DataRow(
+                                          cells: [
+                                            DataCell(
+                                              Text(
+                                                "$serialNo",
+                                                style: GoogleFonts.inter(
+                                                  fontSize: 13,
+                                                  color: const Color(0xFF475569),
+                                                ),
+                                              ),
+                                            ),
+                                            DataCell(
+                                              Text(
+                                                code,
+                                                style: GoogleFonts.inter(
+                                                  fontSize: 13,
+                                                  fontWeight: FontWeight.w600,
+                                                  color: const Color(0xFF2563EB),
+                                                ),
+                                              ),
+                                            ),
+                                            DataCell(
+                                              Text(
+                                                item['name'] ?? "No Name",
+                                                style: GoogleFonts.inter(
+                                                  fontSize: 13,
+                                                  fontWeight: FontWeight.w600,
+                                                  color: const Color(0xFF1E293B),
+                                                ),
+                                              ),
+                                            ),
+                                            DataCell(
+                                              Text(
+                                                "${item['min'] ?? 0}",
+                                                style: GoogleFonts.inter(
+                                                  fontSize: 13,
+                                                  color: const Color(0xFF475569),
+                                                ),
+                                              ),
+                                            ),
+                                            DataCell(
+                                              Text(
+                                                "${item['max'] ?? 0}",
+                                                style: GoogleFonts.inter(
+                                                  fontSize: 13,
+                                                  color: const Color(0xFF475569),
+                                                ),
+                                              ),
+                                            ),
+                                            DataCell(
+                                              Row(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  // Edit Button (Amber)
+                                                  InkWell(
+                                                    onTap: () => editProduct(item),
+                                                    borderRadius: BorderRadius.circular(6),
+                                                    child: Container(
+                                                      width: 32,
+                                                      height: 32,
+                                                      decoration: BoxDecoration(
+                                                        color: const Color(0xFFFEF3C7),
+                                                        border: Border.all(color: const Color(0xFFFDE68A)),
+                                                        borderRadius: BorderRadius.circular(6),
+                                                      ),
+                                                      child: const Icon(
+                                                        Icons.edit_outlined,
+                                                        size: 16,
+                                                        color: Color(0xFFD97706),
+                                                      ),
+                                                    ),
+                                                  ),
+                                                  const SizedBox(width: 8),
+                                                  // Delete Button (Red)
+                                                  InkWell(
+                                                    onTap: () => confirmDeleteDialog(item),
+                                                    borderRadius: BorderRadius.circular(6),
+                                                    child: Container(
+                                                      width: 32,
+                                                      height: 32,
+                                                      decoration: BoxDecoration(
+                                                        color: const Color(0xFFFEE2E2),
+                                                        border: Border.all(color: const Color(0xFFFECACA)),
+                                                        borderRadius: BorderRadius.circular(6),
+                                                      ),
+                                                      child: const Icon(
+                                                        Icons.delete_outline,
+                                                        size: 16,
+                                                        color: Color(0xFFDC2626),
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          ],
+                                        );
+                                      }),
                               ),
-                            ],
-                          )
+                            ),
+                          ),
+
+                          const Divider(height: 1, thickness: 1, color: Color(0xFFF1F5F9)),
+
+                          // 4. Pagination Footer Bar
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                            child: LayoutBuilder(
+                              builder: (context, constraints) {
+                                final isSmall = constraints.maxWidth < 620;
+                                final entriesText = Text(
+                                  "Showing $startEntry to $endEntry of $totalEntries entries",
+                                  style: GoogleFonts.inter(
+                                    fontSize: 12,
+                                    color: const Color(0xFF64748B),
+                                  ),
+                                );
+
+                                final paginationControls = SingleChildScrollView(
+                                  scrollDirection: Axis.horizontal,
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      // Go to Page input
+                                      Text(
+                                        "Go to Page: ",
+                                        style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B)),
+                                      ),
+                                      Container(
+                                        width: 44,
+                                        height: 32,
+                                        margin: const EdgeInsets.only(right: 12),
+                                        child: TextField(
+                                          controller: pageInputController,
+                                          keyboardType: TextInputType.number,
+                                          textAlign: TextAlign.center,
+                                          style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold),
+                                          onSubmitted: (val) {
+                                            final p = int.tryParse(val) ?? 1;
+                                            goToPage(p);
+                                          },
+                                          decoration: InputDecoration(
+                                            contentPadding: EdgeInsets.zero,
+                                            border: OutlineInputBorder(
+                                              borderRadius: BorderRadius.circular(6),
+                                              borderSide: BorderSide(color: Colors.grey.shade300),
+                                            ),
+                                            enabledBorder: OutlineInputBorder(
+                                              borderRadius: BorderRadius.circular(6),
+                                              borderSide: BorderSide(color: Colors.grey.shade300),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+
+                                      // Previous Button
+                                      _buildPageNavBtn("«", currentPage > 1 ? () => goToPage(currentPage - 1) : null),
+
+                                      // Page numbers
+                                      ..._buildPageNumbersList(),
+
+                                      // Next Button
+                                      _buildPageNavBtn("»", currentPage < totalPages ? () => goToPage(currentPage + 1) : null),
+                                    ],
+                                  ),
+                                );
+
+                                if (isSmall) {
+                                  return Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      entriesText,
+                                      const SizedBox(height: 12),
+                                      paginationControls,
+                                    ],
+                                  );
+                                }
+
+                                return Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    entriesText,
+                                    paginationControls,
+                                  ],
+                                );
+                              },
+                            ),
+                          ),
                         ],
                       ),
                     ),
-                  );
-                },
+                  ],
+                ),
               ),
       ),
     );
+  }
+
+  Widget _buildSearchField() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          "PRODUCT SEARCH",
+          style: GoogleFonts.inter(
+            fontSize: 11,
+            fontWeight: FontWeight.bold,
+            color: const Color(0xFF64748B),
+            letterSpacing: 0.5,
+          ),
+        ),
+        const SizedBox(height: 6),
+        SizedBox(
+          height: 42,
+          child: TextField(
+            controller: searchController,
+            onChanged: (val) {
+              setState(() {
+                searchQuery = val;
+                currentPage = 1;
+                pageInputController.text = "1";
+              });
+            },
+            style: GoogleFonts.inter(fontSize: 13),
+            decoration: InputDecoration(
+              hintText: "Type product name or code...",
+              hintStyle: GoogleFonts.inter(color: Colors.grey.shade400, fontSize: 13),
+              filled: true,
+              fillColor: Colors.white,
+              contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: BorderSide(color: Colors.grey.shade300),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: BorderSide(color: Colors.grey.shade300),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(color: Color(0xFF2563EB), width: 1.5),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildShowDropdown() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          "SHOW",
+          style: GoogleFonts.inter(
+            fontSize: 11,
+            fontWeight: FontWeight.bold,
+            color: const Color(0xFF64748B),
+            letterSpacing: 0.5,
+          ),
+        ),
+        const SizedBox(height: 6),
+        Container(
+          height: 42,
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: Colors.grey.shade300),
+          ),
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<int>(
+              value: pageSize,
+              icon: const Icon(Icons.keyboard_arrow_down, size: 18, color: Colors.grey),
+              style: GoogleFonts.inter(fontSize: 13, color: const Color(0xFF0F172A), fontWeight: FontWeight.w600),
+              items: pageSizeOptions.map((size) {
+                return DropdownMenuItem<int>(
+                  value: size,
+                  child: Text("$size"),
+                );
+              }).toList(),
+              onChanged: (val) {
+                if (val != null) {
+                  setState(() {
+                    pageSize = val;
+                    currentPage = 1;
+                    pageInputController.text = "1";
+                  });
+                }
+              },
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPageNavBtn(String text, VoidCallback? onTap) {
+    final bool disabled = onTap == null;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(6),
+      child: Container(
+        width: 32,
+        height: 32,
+        margin: const EdgeInsets.symmetric(horizontal: 2),
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: disabled ? const Color(0xFFF1F5F9) : Colors.white,
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(color: Colors.grey.shade300),
+        ),
+        child: Text(
+          text,
+          style: GoogleFonts.inter(
+            fontSize: 12,
+            fontWeight: FontWeight.bold,
+            color: disabled ? Colors.grey.shade400 : const Color(0xFF475569),
+          ),
+        ),
+      ),
+    );
+  }
+
+  List<Widget> _buildPageNumbersList() {
+    List<Widget> list = [];
+    final pages = totalPages;
+    int start = max(1, currentPage - 2);
+    int end = min(pages, start + 4);
+    if (end - start < 4) {
+      start = max(1, end - 4);
+    }
+
+    for (int i = start; i <= end; i++) {
+      final isCurrent = i == currentPage;
+      list.add(
+        InkWell(
+          onTap: () => goToPage(i),
+          borderRadius: BorderRadius.circular(6),
+          child: Container(
+            width: 32,
+            height: 32,
+            margin: const EdgeInsets.symmetric(horizontal: 2),
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: isCurrent ? const Color(0xFF2563EB) : Colors.white,
+              borderRadius: BorderRadius.circular(6),
+              border: Border.all(
+                color: isCurrent ? const Color(0xFF2563EB) : Colors.grey.shade300,
+              ),
+            ),
+            child: Text(
+              "$i",
+              style: GoogleFonts.inter(
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+                color: isCurrent ? Colors.white : const Color(0xFF475569),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+    return list;
   }
 }

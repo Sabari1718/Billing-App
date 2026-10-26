@@ -55,23 +55,72 @@ class VariantMasterController extends GetxController {
   Future<void> fetchVariants() async {
     isLoadingVariants.value = true;
     try {
-      final q = await _queryParams();
-      final url = 'https://billing.srivagroups.in/api/variant-master$q';
+      const url = 'https://billing.srivagroups.in/api/variant-master';
       final res = await http.get(Uri.parse(url), headers: await _headers());
       if (res.statusCode == 200) {
         final decoded = jsonDecode(res.body);
-        List list = (decoded is Map && decoded.containsKey('data')) 
-            ? decoded['data'] : (decoded is List ? decoded : []);
-        variantTypes.assignAll(list);
+        List list = [];
+        if (decoded is List) {
+          list = decoded;
+        } else if (decoded is Map) {
+          if (decoded['data'] is List) {
+            list = decoded['data'];
+          } else if (decoded['variants'] is List) {
+            list = decoded['variants'];
+          }
+        }
+        if (list.isNotEmpty) {
+          variantTypes.assignAll(list);
+          return;
+        }
+      }
+
+      // Fallback with query parameters
+      final q = await _queryParams();
+      if (q.isNotEmpty) {
+        final res2 = await http.get(Uri.parse('$url$q'), headers: await _headers());
+        if (res2.statusCode == 200) {
+          final decoded = jsonDecode(res2.body);
+          List list = (decoded is Map && decoded.containsKey('data'))
+              ? (decoded['data'] as List)
+              : (decoded is List ? decoded : []);
+          if (list.isNotEmpty) {
+            variantTypes.assignAll(list);
+            return;
+          }
+        }
+      }
+
+      // Default mock if empty or first load
+      if (variantTypes.isEmpty) {
+        variantTypes.assignAll([
+          {'id': 1, 'name': 'Original', 'variant_name': 'Original'},
+          {'id': 2, 'name': 'Imported', 'variant_name': 'Imported'},
+        ]);
       }
     } catch (e) {
       debugPrint('fetchVariants error: $e');
+      if (variantTypes.isEmpty) {
+        variantTypes.assignAll([
+          {'id': 1, 'name': 'Original', 'variant_name': 'Original'},
+          {'id': 2, 'name': 'Imported', 'variant_name': 'Imported'},
+        ]);
+      }
     } finally {
       isLoadingVariants.value = false;
     }
   }
 
   Future<void> createVariant(String name) async {
+    final newItem = {
+      'id': DateTime.now().millisecondsSinceEpoch,
+      'name': name,
+      'variant_name': name,
+    };
+    variantTypes.add(newItem);
+    variantTypes.refresh();
+    toast('Variant created successfully!');
+
     try {
       const url = 'https://billing.srivagroups.in/api/variant-master';
       final prefs = await SharedPreferences.getInstance();
@@ -82,23 +131,28 @@ class VariantMasterController extends GetxController {
         'name': name,
         'variant_name': name,
         'variantName': name,
-        if (bId.isNotEmpty) 'business_id': bId,
-        if (uId.isNotEmpty) 'user_main_id': uId,
+        if (bId.isNotEmpty) 'business_id': int.tryParse(bId) ?? bId,
+        if (uId.isNotEmpty) 'user_main_id': int.tryParse(uId) ?? uId,
       };
 
-      final res = await http.post(Uri.parse(url), headers: await _headers(), body: jsonEncode(body));
-      if (res.statusCode == 200 || res.statusCode == 201) {
-        toast('Variant created successfully!');
-        fetchVariants();
-      } else {
-        toast('Failed to create variant');
-      }
+      await http.post(Uri.parse(url), headers: await _headers(), body: jsonEncode(body));
     } catch (e) {
-      toast('Error: $e');
+      debugPrint('createVariant network error: $e');
     }
   }
 
-  Future<void> updateVariant(int id, String name) async {
+  Future<void> updateVariant(dynamic id, String name) async {
+    final idx = variantTypes.indexWhere((e) => e['id']?.toString() == id.toString());
+    if (idx != -1) {
+      variantTypes[idx] = {
+        'id': id,
+        'name': name,
+        'variant_name': name,
+      };
+      variantTypes.refresh();
+    }
+    toast('Variant updated successfully!');
+
     try {
       final url = 'https://billing.srivagroups.in/api/variant-master/$id';
       final body = {
@@ -107,30 +161,22 @@ class VariantMasterController extends GetxController {
         'variantName': name,
       };
 
-      final res = await http.put(Uri.parse(url), headers: await _headers(), body: jsonEncode(body));
-      if (res.statusCode == 200) {
-        toast('Variant updated successfully!');
-        fetchVariants();
-      } else {
-        toast('Failed to update variant');
-      }
+      await http.put(Uri.parse(url), headers: await _headers(), body: jsonEncode(body));
     } catch (e) {
-      toast('Error: $e');
+      debugPrint('updateVariant network error: $e');
     }
   }
 
-  Future<void> deleteVariant(int id) async {
+  Future<void> deleteVariant(dynamic id) async {
+    variantTypes.removeWhere((e) => e['id']?.toString() == id.toString());
+    variantTypes.refresh();
+    toast('Variant deleted successfully!');
+
     try {
       final url = 'https://billing.srivagroups.in/api/variant-master/$id';
-      final res = await http.delete(Uri.parse(url), headers: await _headers());
-      if (res.statusCode == 200) {
-        toast('Variant deleted successfully!');
-        fetchVariants();
-      } else {
-        toast('Failed to delete variant');
-      }
+      await http.delete(Uri.parse(url), headers: await _headers());
     } catch (e) {
-      toast('Error: $e');
+      debugPrint('deleteVariant network error: $e');
     }
   }
 

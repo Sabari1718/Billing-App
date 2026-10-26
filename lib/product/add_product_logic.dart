@@ -6,6 +6,44 @@ extension _ProductEntryPageStateLogic on _ProductEntryPageState {
       final list = await ApiService.getCategoryGroups();
       if (!mounted) return;
       setState(() => categoryGroups = list);
+
+      if (list.isNotEmpty) {
+        final targetGroupId = editCategoryGroupId ?? list.first.id!;
+        selectedCategoryGroupId = targetGroupId;
+        await loadCategoryBrandData(targetGroupId);
+      }
+
+      if (editCategoryId != null) {
+        selectedCategoryId = editCategoryId;
+        final matchedItem = rawCategoryBrandData.firstWhere(
+          (item) => item['category_id'] == editCategoryId,
+          orElse: () => {},
+        );
+        final brandList = matchedItem['brands'] ?? [];
+        final Map<int, Map<String, dynamic>> uniqueBrands = {};
+        for (var brand in brandList) {
+          if (brand['id'] != null) {
+            uniqueBrands[brand['id']] = {
+              "id": brand['id'],
+              "name": brand['name'] ?? "No Name",
+            };
+          }
+        }
+        setState(() {
+          brands = uniqueBrands.values.toList();
+          selectedBrandId = editBrandId;
+        });
+
+        if (editBrandId != null) {
+          await loadProducts(selectedCategoryId!, editBrandId!);
+          if (mounted) {
+            setState(() {
+              selectedProductId = widget.editItem?['product_id'];
+              selectedProductName = widget.editItem?['name'];
+            });
+          }
+        }
+      }
     } catch (e) {
       AppLogger.error("INIT ERROR", e);
     } finally {
@@ -54,13 +92,14 @@ extension _ProductEntryPageStateLogic on _ProductEntryPageState {
       setState(() {
         categoryItems = sortedCategoryItems;
         secondaryCategories = [];
-        brands = [];
-        products = [];
-
-        selectedCategoryId = null;
-        selectedSecondaryCategoryId = null;
-        selectedBrandId = null;
-        selectedProductId = null;
+        if (editAllocationId == null) {
+          brands = [];
+          products = [];
+          selectedCategoryId = null;
+          selectedSecondaryCategoryId = null;
+          selectedBrandId = null;
+          selectedProductId = null;
+        }
       });
 
     } catch (e) {
@@ -408,8 +447,11 @@ extension _ProductEntryPageStateLogic on _ProductEntryPageState {
         cancelEdit();
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Updated successfully ✅")),
+          const SnackBar(content: Text("Updated successfully ✅"), backgroundColor: Colors.green),
         );
+        if (widget.editItem != null) {
+          Navigator.pop(context, true);
+        }
       } else {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
@@ -443,11 +485,10 @@ extension _ProductEntryPageStateLogic on _ProductEntryPageState {
       if (success) {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Saved successfully ✅")),
+          const SnackBar(content: Text("Saved successfully ✅"), backgroundColor: Colors.green),
         );
         // Reset selections
         setState(() {
-          selectedCategoryGroupId = null;
           selectedCategoryId = null;
           selectedSecondaryCategoryId = null;
           selectedBrandId = null;
@@ -466,6 +507,16 @@ extension _ProductEntryPageStateLogic on _ProductEntryPageState {
         );
         setState(() => isLoading = false);
       }
+    }
+  }
+
+  void _triggerSimulateScan() {
+    final text = barcodeController.text.trim();
+    if (text.isNotEmpty) {
+      _handleBarcodeScan(text);
+    } else {
+      barcodeController.text = "HUAYU-REMOTE-123";
+      _handleBarcodeScan("HUAYU-REMOTE-123");
     }
   }
 }
