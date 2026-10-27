@@ -7,18 +7,21 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:billingapp/utils/app_logger.dart';
 import 'package:flutter/foundation.dart';
+import 'stock list.dart';
 
 part 'stock_entry_dialogs.dart';
 part 'stock_entry_logic.dart';
 
 class StockEntryPage extends StatefulWidget {
-  const StockEntryPage({super.key});
+  final Map<String, dynamic>? editStockItem;
+  const StockEntryPage({super.key, this.editStockItem});
 
   @override
   _StockEntryPageState createState() => _StockEntryPageState();
 }
 
 class _StockEntryPageState extends State<StockEntryPage> {
+  bool get isEditing => widget.editStockItem != null;
   List suppliers = [];
   List products = [];
 
@@ -52,8 +55,10 @@ class _StockEntryPageState extends State<StockEntryPage> {
   bool isSaving = false;
 
   Map<String, String> get headers => {
-        "Authorization": "Bearer $token",
+        if (token.isNotEmpty) "Authorization": "Bearer $token",
         "Accept": "application/json",
+        "Content-Type": "application/json",
+        "X-App-ID": "Product94674",
       };
 
   List<Map<String, dynamic>> variants = [];
@@ -62,8 +67,10 @@ class _StockEntryPageState extends State<StockEntryPage> {
   List<Map<String, dynamic>> stockTypes = [];
   bool isLoadingStockTypes = false;
   String? currentBusinessId;
+  String? currentStoreId;
+  String productGstRate = "18% GST";
 
-  Map<int, Map<String, String>> variantTabData = {};
+  Map<int, Map<String, dynamic>> variantTabData = {};
   Map<int, List<Map<String, dynamic>>> stockTabData = {};
 
   @override
@@ -112,7 +119,7 @@ class _StockEntryPageState extends State<StockEntryPage> {
             ),
             const SizedBox(width: 10),
             Text(
-              "Stock Entry",
+              isEditing ? "Edit Stock Entry" : "Stock Entry",
               style: GoogleFonts.inter(
                 fontSize: 20,
                 fontWeight: FontWeight.w800,
@@ -121,34 +128,63 @@ class _StockEntryPageState extends State<StockEntryPage> {
             ),
           ],
         ),
-        // Manufacture Button (Matching Photos 1, 2, 3)
-        OutlinedButton.icon(
-          onPressed: () {
-            setState(() {
-              isManufactureMode = !isManufactureMode;
-            });
-          },
-          icon: Icon(
-            Icons.factory_outlined,
-            size: 15,
-            color: isManufactureMode ? const Color(0xFF2563EB) : const Color(0xFF475569),
-          ),
-          label: Text(
-            isManufactureMode ? "Manufacture ✓" : "Manufacture",
-            style: GoogleFonts.inter(
-              fontSize: 12,
-              fontWeight: FontWeight.bold,
-              color: isManufactureMode ? const Color(0xFF2563EB) : const Color(0xFF475569),
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            OutlinedButton.icon(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const StockListPage()),
+                );
+              },
+              icon: const Icon(Icons.list_alt_rounded, size: 15, color: Color(0xFF2563EB)),
+              label: Text(
+                "Stock List",
+                style: GoogleFonts.inter(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: const Color(0xFF2563EB),
+                ),
+              ),
+              style: OutlinedButton.styleFrom(
+                backgroundColor: const Color(0xFFEFF6FF),
+                side: const BorderSide(color: Color(0xFF93C5FD)),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              ),
             ),
-          ),
-          style: OutlinedButton.styleFrom(
-            backgroundColor: isManufactureMode ? const Color(0xFFEFF6FF) : Colors.white,
-            side: BorderSide(
-              color: isManufactureMode ? const Color(0xFF93C5FD) : Colors.grey.shade300,
+            const SizedBox(width: 8),
+            // Manufacture Button (Matching Photos 1, 2, 3)
+            OutlinedButton.icon(
+              onPressed: () {
+                setState(() {
+                  isManufactureMode = !isManufactureMode;
+                });
+              },
+              icon: Icon(
+                Icons.factory_outlined,
+                size: 15,
+                color: isManufactureMode ? const Color(0xFF2563EB) : const Color(0xFF475569),
+              ),
+              label: Text(
+                isManufactureMode ? "Manufacture ✓" : "Manufacture",
+                style: GoogleFonts.inter(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: isManufactureMode ? const Color(0xFF2563EB) : const Color(0xFF475569),
+                ),
+              ),
+              style: OutlinedButton.styleFrom(
+                backgroundColor: isManufactureMode ? const Color(0xFFEFF6FF) : Colors.white,
+                side: BorderSide(
+                  color: isManufactureMode ? const Color(0xFF93C5FD) : Colors.grey.shade300,
+                ),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              ),
             ),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-          ),
+          ],
         ),
       ],
     );
@@ -175,7 +211,7 @@ class _StockEntryPageState extends State<StockEntryPage> {
                   color: withVariantMode ? Colors.white : Colors.transparent,
                   borderRadius: BorderRadius.circular(16),
                   boxShadow: withVariantMode
-                      ? [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 4, offset: const Offset(0, 1))]
+                      ? [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 4, offset: const Offset(0, 1))]
                       : null,
                 ),
                 child: Row(
@@ -213,7 +249,7 @@ class _StockEntryPageState extends State<StockEntryPage> {
                   color: !withVariantMode ? Colors.white : Colors.transparent,
                   borderRadius: BorderRadius.circular(16),
                   boxShadow: !withVariantMode
-                      ? [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 4, offset: const Offset(0, 1))]
+                      ? [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 4, offset: const Offset(0, 1))]
                       : null,
                 ),
                 child: Row(
@@ -252,7 +288,7 @@ class _StockEntryPageState extends State<StockEntryPage> {
       backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
         title: Text(
-          "Stock Entry",
+          isEditing ? "Edit Stock Entry" : "Stock Entry",
           style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 17, color: const Color(0xFF0F172A)),
         ),
         backgroundColor: Colors.white,
@@ -422,14 +458,7 @@ class _StockEntryPageState extends State<StockEntryPage> {
                       onChanged: (val) {
                         setState(() {
                           selectedProduct = val;
-                          final matched = products.where((p) => p['id'].toString() == val).toList();
-                          if (matched.isNotEmpty) {
-                            currentMin = int.tryParse(matched.first['min']?.toString() ?? '1') ?? 1;
-                            currentMax = int.tryParse(matched.first['max']?.toString() ?? '100') ?? 100;
-                          } else {
-                            currentMin = null;
-                            currentMax = null;
-                          }
+                          onProductSelected(val);
                         });
                       },
                       decoration: _inputDecoration(),
@@ -513,7 +542,7 @@ class _StockEntryPageState extends State<StockEntryPage> {
                             ),
                             child: isSaving
                                 ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                                : Text("Save", style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 14)),
+                                : Text(isEditing ? "Update" : "Save", style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 14)),
                           ),
                         ),
                         const SizedBox(width: 14),

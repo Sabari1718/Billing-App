@@ -1,5 +1,36 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
+
+const String _kStorageBaseUrl = "https://billing.srivagroups.in/api";
+
+Future<Map<String, String>> _getStorageApiHeaders() async {
+  final prefs = await SharedPreferences.getInstance();
+  final token = prefs.getString("billing_auth_token") ??
+      prefs.getString("auth_token") ??
+      prefs.getString("token") ??
+      prefs.getString("access_token") ??
+      "";
+  final cleanToken = token.startsWith("Bearer ") ? token.substring(7).trim() : token.trim();
+  final businessId = prefs.getString("selected_business_id") ??
+      prefs.get("business_id")?.toString() ??
+      "52";
+  final storeId = prefs.getString("selected_store_id") ??
+      prefs.get("store_id")?.toString() ??
+      "38";
+
+  return {
+    "Accept": "application/json",
+    "Content-Type": "application/json",
+    "X-App-ID": "Product94674",
+    if (cleanToken.isNotEmpty) "Authorization": "Bearer $cleanToken",
+    "x-business-id": businessId,
+    "x-store-id": (storeId == '1' || storeId.isEmpty) ? '38' : storeId,
+    "x-platform-id": "1",
+  };
+}
 
 class StoragePage extends StatefulWidget {
   const StoragePage({super.key});
@@ -15,55 +46,81 @@ class _StoragePageState extends State<StoragePage> {
   // Selected Active Storage (Photos 1 -> 2 transition)
   Map<String, dynamic>? activeStorage;
 
+  // Loading indicators
+  bool isLoadingStorage = false;
+  bool isLoadingAddress = false;
+  bool isLoadingStructure = false;
+  bool isLoadingLocation = false;
+
   // -----------------------------------------------------------------------
-  // STEP 1 STATE: Storage List
+  // STEP 1 STATE: Storage List (GET /api/storage/types)
   // -----------------------------------------------------------------------
   List<Map<String, dynamic>> storages = [
     {
-      "id": 1,
+      "id": 20,
+      "business_id": 52,
+      "platform_id": 1,
+      "store_id": 38,
       "name": "CircuitPoint Store",
       "desc": "Manage storage, levels and items",
     },
   ];
 
   // -----------------------------------------------------------------------
-  // STEP 2 STATE: Address Setup
+  // STEP 2 STATE: Address Setup (GET /address-fields/:id & /address-values/:id)
   // -----------------------------------------------------------------------
   final TextEditingController newFieldCtrl = TextEditingController();
   String insertAfterSelection = "At the end";
 
-  List<String> addressFields = ["Address", "Pincode", "dd", "gb", "dd"];
-  final Map<String, TextEditingController> addressFieldControllers = {};
+  List<Map<String, dynamic>> rawAddressFields = [
+    {"id": 63, "storage_type_id": 20, "field_name": "Address", "field_order": 1},
+    {"id": 64, "storage_type_id": 20, "field_name": "Pincode", "field_order": 2},
+    {"id": 71, "storage_type_id": 20, "field_name": "dd", "field_order": 3},
+    {"id": 72, "storage_type_id": 20, "field_name": "gb", "field_order": 4},
+    {"id": 73, "storage_type_id": 20, "field_name": "dd", "field_order": 5},
+  ];
+
+  final Map<int, TextEditingController> addressFieldControllers = {};
 
   int? editingAddressIndex;
+  dynamic editingGroupId;
+  Map<int, int> editingAddressRecordIds = {};
 
-  List<Map<String, String>> savedAddresses = [
+  List<Map<String, dynamic>> savedAddressGroups = [
     {
-      "Address": "1/143 Near Avinashi Road, Kathir College Rd, Neelambur",
+      "group_id": 1786083223756,
+      "first_id": 224,
+      "Address": "1/143 Near Avinashi Road, Kathir College Rd,Neelambur",
       "Pincode": "641062",
-      "dd": "",
-      "gb": "",
+      "values": {
+        63: "1/143 Near Avinashi Road, Kathir College Rd,Neelambur",
+        64: "641062",
+      },
+      "record_ids": {
+        63: 224,
+        64: 225,
+      },
     },
   ];
 
   // -----------------------------------------------------------------------
-  // STEP 3 STATE: Structure Design
+  // STEP 3 STATE: Structure Design (GET & PUT /api/storage/structure/:id)
   // -----------------------------------------------------------------------
   final TextEditingController newLevelCtrl = TextEditingController();
   bool supportGridPartitioning = false;
-  int? editingLevelIndex; // For Photo 2 & 3: editing a level in Add Structure Level
+  int? editingLevelIndex;
 
   List<Map<String, dynamic>> structureLevels = [
-    {"level": 1, "name": "Building"},
-    {"level": 2, "name": "Floor"},
-    {"level": 3, "name": "Rack"},
-    {"level": 4, "name": "Shelf"},
-    {"level": 5, "name": "Box"},
-    {"level": 6, "name": "Container"},
+    {"id": 135, "level": 1, "name": "Building", "is_partitionable": false},
+    {"id": 136, "level": 2, "name": "Floor", "is_partitionable": false},
+    {"id": 137, "level": 3, "name": "Rack", "is_partitionable": false},
+    {"id": 138, "level": 4, "name": "Shelf", "is_partitionable": false},
+    {"id": 141, "level": 5, "name": "Box", "is_partitionable": false},
+    {"id": 139, "level": 6, "name": "Container", "is_partitionable": false},
   ];
 
   // -----------------------------------------------------------------------
-  // STEP 4 STATE: Location Builder Hierarchy Tree (Photos 4 & 5)
+  // STEP 4 STATE: Location Builder Hierarchy Tree (GET /locations/:id)
   // -----------------------------------------------------------------------
   List<Map<String, dynamic>> locationsTree = [
     {
@@ -99,13 +156,25 @@ class _StoragePageState extends State<StoragePage> {
   void initState() {
     super.initState();
     _initAddressControllers();
+    activeStorage = storages.first;
+    _fetchStorageTypes().then((_) {
+      final sId = activeStorage?['id'] as int? ?? 20;
+      _fetchAddressFieldsAndValues(sId);
+      _fetchStructureLevels(sId);
+    });
+  }
+
+  TextEditingController _getControllerForField(int fieldId) {
+    if (!addressFieldControllers.containsKey(fieldId)) {
+      addressFieldControllers[fieldId] = TextEditingController();
+    }
+    return addressFieldControllers[fieldId]!;
   }
 
   void _initAddressControllers() {
-    for (var f in addressFields) {
-      if (!addressFieldControllers.containsKey(f)) {
-        addressFieldControllers[f] = TextEditingController();
-      }
+    for (var f in rawAddressFields) {
+      final fId = f['id'] as int;
+      _getControllerForField(fId);
     }
   }
 
@@ -120,8 +189,285 @@ class _StoragePageState extends State<StoragePage> {
   }
 
   // =========================================================================
+  // LIVE API: 1. Storage Types (GET https://billing.srivagroups.in/api/storage/types)
+  // =========================================================================
+  Future<void> _fetchStorageTypes() async {
+    setState(() => isLoadingStorage = true);
+    try {
+      final headers = await _getStorageApiHeaders();
+      final url = "$_kStorageBaseUrl/storage/types";
+      final res = await http.get(Uri.parse(url), headers: headers).timeout(const Duration(seconds: 10));
+
+      if (res.statusCode >= 200 && res.statusCode < 300) {
+        final decoded = jsonDecode(res.body);
+        final data = (decoded is Map ? decoded['data'] : decoded) as List<dynamic>?;
+        if (data != null && data.isNotEmpty) {
+          final list = List<Map<String, dynamic>>.from(data).map((item) {
+            return {
+              "id": item['id'],
+              "name": item['name'] ?? "CircuitPoint Store",
+              "desc": "Manage storage, levels and items",
+              "business_id": item['business_id'],
+              "store_id": item['store_id'],
+              "platform_id": item['platform_id'],
+            };
+          }).toList();
+          setState(() {
+            storages = list;
+            activeStorage = storages.firstWhere(
+              (s) => s['id'] == 20,
+              orElse: () => storages.first,
+            );
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint("Storage types fetch error: $e");
+    } finally {
+      if (mounted) setState(() => isLoadingStorage = false);
+    }
+  }
+
+  // =========================================================================
+  // LIVE API: 2. Address Fields & Address Values
+  // GET /api/storage/address-fields/{id}
+  // GET /api/storage/address-values/{id}
+  // =========================================================================
+  Future<void> _fetchAddressFieldsAndValues(int sId) async {
+    setState(() => isLoadingAddress = true);
+    try {
+      final headers = await _getStorageApiHeaders();
+
+      // 1. Fetch Fields
+      final fieldsUrl = "$_kStorageBaseUrl/storage/address-fields/$sId";
+      final fieldsRes = await http.get(Uri.parse(fieldsUrl), headers: headers).timeout(const Duration(seconds: 10));
+      if (fieldsRes.statusCode >= 200 && fieldsRes.statusCode < 300) {
+        final decoded = jsonDecode(fieldsRes.body);
+        final data = (decoded is Map ? decoded['data'] : decoded) as List<dynamic>?;
+        if (data != null && data.isNotEmpty) {
+          final fieldsList = List<Map<String, dynamic>>.from(data);
+          fieldsList.sort((a, b) => (a['field_order'] ?? 0).compareTo(b['field_order'] ?? 0));
+          setState(() {
+            rawAddressFields = fieldsList;
+            for (var f in rawAddressFields) {
+              final fId = f['id'] as int;
+              _getControllerForField(fId);
+            }
+          });
+        }
+      }
+
+      // 2. Fetch Values
+      final valuesUrl = "$_kStorageBaseUrl/storage/address-values/$sId";
+      final valuesRes = await http.get(Uri.parse(valuesUrl), headers: headers).timeout(const Duration(seconds: 10));
+      if (valuesRes.statusCode >= 200 && valuesRes.statusCode < 300) {
+        final decoded = jsonDecode(valuesRes.body);
+        final data = (decoded is Map ? decoded['data'] : decoded) as List<dynamic>?;
+        if (data != null) {
+          final valuesList = List<Map<String, dynamic>>.from(data);
+
+          // Group by address_group_id
+          Map<dynamic, Map<String, dynamic>> groups = {};
+          for (var item in valuesList) {
+            final gId = item['address_group_id'];
+            if (!groups.containsKey(gId)) {
+              groups[gId] = {
+                "group_id": gId,
+                "first_id": item['id'],
+                "Address": "",
+                "Pincode": "",
+                "values": <int, String>{},
+                "record_ids": <int, int>{},
+              };
+            }
+            final fieldId = item['field_id'] as int;
+            final fieldVal = (item['field_value'] ?? "").toString();
+            (groups[gId]!['values'] as Map<int, String>)[fieldId] = fieldVal;
+            (groups[gId]!['record_ids'] as Map<int, int>)[fieldId] = item['id'];
+
+            final fieldName = (item['field_name'] ?? "").toString().toLowerCase();
+            if (fieldName.contains("address")) {
+              groups[gId]!['Address'] = fieldVal;
+            } else if (fieldName.contains("pincode")) {
+              groups[gId]!['Pincode'] = fieldVal;
+            }
+          }
+
+          setState(() {
+            savedAddressGroups = groups.values.toList();
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint("Address fields/values fetch error: $e");
+    } finally {
+      if (mounted) setState(() => isLoadingAddress = false);
+    }
+  }
+
+  // =========================================================================
+  // LIVE API: 3. Structure Levels (GET /api/storage/structure/{id})
+  // =========================================================================
+  Future<void> _fetchStructureLevels(int sId) async {
+    setState(() => isLoadingStructure = true);
+    try {
+      final headers = await _getStorageApiHeaders();
+      final url = "$_kStorageBaseUrl/storage/structure/$sId";
+      final res = await http.get(Uri.parse(url), headers: headers).timeout(const Duration(seconds: 10));
+
+      if (res.statusCode >= 200 && res.statusCode < 300) {
+        final decoded = jsonDecode(res.body);
+        final data = (decoded is Map ? decoded['data'] : decoded) as List<dynamic>?;
+        if (data != null && data.isNotEmpty) {
+          final list = List<Map<String, dynamic>>.from(data);
+          list.sort((a, b) => (a['level_order'] ?? 0).compareTo(b['level_order'] ?? 0));
+          setState(() {
+            structureLevels = list.map((item) {
+              return {
+                "id": item['id'],
+                "level": item['level_order'] ?? 1,
+                "name": item['name'] ?? "",
+                "is_partitionable": item['is_partitionable'] == 1 || item['is_partitionable'] == true,
+              };
+            }).toList();
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint("Structure levels fetch error: $e");
+    } finally {
+      if (mounted) setState(() => isLoadingStructure = false);
+    }
+  }
+
+  // =========================================================================
+  // LIVE API: 4. Location Builder Data (GET /api/storage/locations/{id})
+  // =========================================================================
+  Future<void> _fetchLocations(int sId) async {
+    setState(() => isLoadingLocation = true);
+    try {
+      final headers = await _getStorageApiHeaders();
+      final url = "$_kStorageBaseUrl/storage/locations/$sId";
+      final res = await http.get(Uri.parse(url), headers: headers).timeout(const Duration(seconds: 10));
+
+      if (res.statusCode >= 200 && res.statusCode < 300) {
+        final decoded = jsonDecode(res.body);
+        List<dynamic> fetchedData = [];
+        if (decoded is List) {
+          fetchedData = decoded;
+        } else if (decoded is Map) {
+          final candidate = decoded['data'] ?? decoded['locations'] ?? decoded['hierarchy'];
+          if (candidate is List) {
+            fetchedData = candidate;
+          }
+        }
+        if (fetchedData.isNotEmpty) {
+          bool isNested = fetchedData.any((item) => item is Map && item['children'] != null && (item['children'] as List).isNotEmpty);
+          List<Map<String, dynamic>> parsedTree;
+          if (isNested) {
+            parsedTree = _normalizeLocationTree(fetchedData);
+          } else {
+            parsedTree = _buildTreeFromFlatLocations(fetchedData);
+          }
+          if (mounted) {
+            setState(() {
+              locationsTree = parsedTree;
+            });
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint("Locations fetch error: $e");
+    } finally {
+      if (mounted) setState(() => isLoadingLocation = false);
+    }
+  }
+
+  List<Map<String, dynamic>> _normalizeLocationTree(List<dynamic> list, {int depth = 0}) {
+    final List<Map<String, dynamic>> result = [];
+    for (var item in list) {
+      if (item is! Map) continue;
+      final m = Map<String, dynamic>.from(item);
+      final rawChildren = (m['children'] as List<dynamic>?) ?? [];
+      final rawRacks = (m['racks'] as List<dynamic>?) ?? [];
+      final lvlName = m['level_name'] ?? m['levelName'] ?? (depth == 0 ? "Building" : (depth == 1 ? "Floor" : "Rack"));
+
+      result.add({
+        "id": m['id'],
+        "name": (m['name'] ?? m['location_name'] ?? "Location #${m['id']}").toString(),
+        "code": (m['code'] ?? m['short_code'] ?? "L${m['id']}").toString(),
+        "parent_id": m['parent_id'],
+        "level_id": m['level_id'],
+        "levelName": lvlName.toString(),
+        "isExpanded": true,
+        "children": _normalizeLocationTree(rawChildren, depth: depth + 1),
+        "racks": rawRacks.map((r) => Map<String, dynamic>.from(r as Map)).toList(),
+      });
+    }
+    return result;
+  }
+
+  List<Map<String, dynamic>> _buildTreeFromFlatLocations(List<dynamic> flatList) {
+    final Map<dynamic, Map<String, dynamic>> nodeMap = {};
+    for (var item in flatList) {
+      if (item is! Map) continue;
+      final m = Map<String, dynamic>.from(item);
+      final id = m['id'];
+      if (id == null) continue;
+
+      String lvlName = (m['level_name'] ?? m['level'] ?? '').toString();
+      if (lvlName.isEmpty && m['level_id'] != null) {
+        final matchedLvl = structureLevels.firstWhere(
+          (sl) => sl['id'] == m['level_id'],
+          orElse: () => {},
+        );
+        if (matchedLvl.isNotEmpty) {
+          lvlName = (matchedLvl['name'] ?? '').toString();
+        }
+      }
+      if (lvlName.isEmpty) {
+        lvlName = m['parent_id'] == null ? "Building" : "Floor";
+      }
+
+      nodeMap[id] = {
+        "id": id,
+        "name": (m['name'] ?? m['location_name'] ?? "Location #$id").toString(),
+        "code": (m['code'] ?? m['short_code'] ?? "L$id").toString(),
+        "parent_id": m['parent_id'],
+        "level_id": m['level_id'],
+        "levelName": lvlName,
+        "isExpanded": true,
+        "children": <Map<String, dynamic>>[],
+        "racks": <Map<String, dynamic>>[],
+      };
+    }
+
+    final List<Map<String, dynamic>> roots = [];
+    for (var node in nodeMap.values) {
+      final pid = node['parent_id'];
+      if (pid != null && nodeMap.containsKey(pid)) {
+        (nodeMap[pid]!['children'] as List<Map<String, dynamic>>).add(node);
+      } else {
+        roots.add(node);
+      }
+    }
+    return roots;
+  }
+
+  // =========================================================================
   // STEP 1 ACTIONS: Edit & Add Storage (Photo 1)
   // =========================================================================
+  void _onSelectStorage(Map<String, dynamic> item) {
+    setState(() {
+      activeStorage = item;
+      currentStep = 2; // Advance to Step 2
+    });
+    final sId = item['id'] as int? ?? 20;
+    _fetchAddressFieldsAndValues(sId);
+    _fetchStructureLevels(sId);
+    _fetchLocations(sId);
+  }
+
   void _showEditStorageDialog(Map<String, dynamic> storage) {
     final nameCtrl = TextEditingController(text: storage['name']);
 
@@ -168,19 +514,35 @@ class _StoragePageState extends State<StoragePage> {
             child: const Text("Cancel"),
           ),
           ElevatedButton(
-            onPressed: () {
+            onPressed: () async {
               final newName = nameCtrl.text.trim();
               if (newName.isNotEmpty) {
-                setState(() {
-                  storage['name'] = newName;
-                  if (activeStorage != null && activeStorage!['id'] == storage['id']) {
-                    activeStorage!['name'] = newName;
-                  }
-                });
                 Navigator.pop(ctx);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text("Storage updated successfully"), backgroundColor: Colors.green),
-                );
+                setState(() => isLoadingStorage = true);
+                try {
+                  final headers = await _getStorageApiHeaders();
+                  final id = storage['id'];
+                  http.Response res = await http.put(
+                    Uri.parse("$_kStorageBaseUrl/storage/types/$id"),
+                    headers: headers,
+                    body: jsonEncode({"name": newName}),
+                  );
+                  if (res.statusCode < 200 || res.statusCode >= 300) {
+                    res = await http.put(
+                      Uri.parse("$_kStorageBaseUrl/storage/type/$id"),
+                      headers: headers,
+                      body: jsonEncode({"name": newName}),
+                    );
+                  }
+                  if (!mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text("Storage updated successfully"), backgroundColor: Colors.green),
+                  );
+                } catch (e) {
+                  debugPrint("Update storage error: $e");
+                } finally {
+                  await _fetchStorageTypes();
+                }
               }
             },
             style: ElevatedButton.styleFrom(
@@ -224,20 +586,45 @@ class _StoragePageState extends State<StoragePage> {
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("Cancel")),
           ElevatedButton(
-            onPressed: () {
+            onPressed: () async {
               final name = nameCtrl.text.trim();
               if (name.isNotEmpty) {
-                setState(() {
-                  storages.add({
-                    "id": DateTime.now().millisecondsSinceEpoch,
-                    "name": name,
-                    "desc": "Manage storage, levels and items",
-                  });
-                });
                 Navigator.pop(ctx);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text("Storage created successfully"), backgroundColor: Colors.green),
-                );
+                setState(() => isLoadingStorage = true);
+                try {
+                  final headers = await _getStorageApiHeaders();
+                  final prefs = await SharedPreferences.getInstance();
+                  final storeId = prefs.getString("selected_store_id") ?? prefs.get("store_id")?.toString() ?? "38";
+                  final businessId = prefs.getString("selected_business_id") ?? prefs.get("business_id")?.toString() ?? "52";
+                  http.Response res = await http.post(
+                    Uri.parse("$_kStorageBaseUrl/storage/types"),
+                    headers: headers,
+                    body: jsonEncode({
+                      "name": name,
+                      "store_id": int.tryParse(storeId) ?? 38,
+                      "business_id": int.tryParse(businessId) ?? 52,
+                    }),
+                  );
+                  if (res.statusCode < 200 || res.statusCode >= 300) {
+                    res = await http.post(
+                      Uri.parse("$_kStorageBaseUrl/storage/type"),
+                      headers: headers,
+                      body: jsonEncode({
+                        "name": name,
+                        "store_id": int.tryParse(storeId) ?? 38,
+                        "business_id": int.tryParse(businessId) ?? 52,
+                      }),
+                    );
+                  }
+                  if (!mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text("Storage created successfully"), backgroundColor: Colors.green),
+                  );
+                } catch (e) {
+                  debugPrint("Create storage error: $e");
+                } finally {
+                  await _fetchStorageTypes();
+                }
               }
             },
             style: ElevatedButton.styleFrom(
@@ -262,18 +649,37 @@ class _StoragePageState extends State<StoragePage> {
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("Cancel")),
           ElevatedButton(
-            onPressed: () {
-              setState(() {
-                storages.removeWhere((e) => e['id'] == item['id']);
-                if (activeStorage != null && activeStorage!['id'] == item['id']) {
-                  activeStorage = null;
-                  currentStep = 1;
-                }
-              });
+            onPressed: () async {
               Navigator.pop(ctx);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text("Storage deleted"), backgroundColor: Colors.green),
-              );
+              setState(() => isLoadingStorage = true);
+              try {
+                final headers = await _getStorageApiHeaders();
+                final id = item['id'];
+                http.Response res = await http.delete(
+                  Uri.parse("$_kStorageBaseUrl/storage/types/$id"),
+                  headers: headers,
+                );
+                if (res.statusCode < 200 || res.statusCode >= 300) {
+                  res = await http.delete(
+                    Uri.parse("$_kStorageBaseUrl/storage/type/$id"),
+                    headers: headers,
+                  );
+                }
+                if (!mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text("Storage deleted successfully"), backgroundColor: Colors.green),
+                );
+              } catch (e) {
+                debugPrint("Delete storage error: $e");
+              } finally {
+                await _fetchStorageTypes();
+                if (activeStorage != null && activeStorage!['id'] == item['id']) {
+                  setState(() {
+                    activeStorage = storages.isNotEmpty ? storages.first : null;
+                    if (activeStorage == null) currentStep = 1;
+                  });
+                }
+              }
             },
             style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFEF4444), foregroundColor: Colors.white),
             child: const Text("Delete"),
@@ -284,30 +690,59 @@ class _StoragePageState extends State<StoragePage> {
   }
 
   // =========================================================================
-  // STEP 2 ACTIONS: Address Setup Edit & Delete
+  // STEP 2 ACTIONS: Address Setup Save, Edit (PUT), Delete (DELETE)
   // =========================================================================
-  void _addAddressField() {
-    final field = newFieldCtrl.text.trim();
-    if (field.isEmpty) return;
+  Future<void> _addAddressField() async {
+    final fieldName = newFieldCtrl.text.trim();
+    if (fieldName.isEmpty) return;
+    final sId = activeStorage?['id'] as int? ?? 20;
 
-    setState(() {
-      addressFields.add(field);
-      addressFieldControllers[field] = TextEditingController();
+    setState(() => isLoadingAddress = true);
+    try {
+      final headers = await _getStorageApiHeaders();
+      http.Response res = await http.post(
+        Uri.parse("$_kStorageBaseUrl/storage/address-field"),
+        headers: headers,
+        body: jsonEncode({
+          "storage_type_id": sId,
+          "field_name": fieldName,
+          "field_order": rawAddressFields.length + 1,
+        }),
+      );
+      if (res.statusCode < 200 || res.statusCode >= 300) {
+        res = await http.post(
+          Uri.parse("$_kStorageBaseUrl/storage/address-fields"),
+          headers: headers,
+          body: jsonEncode({
+            "storage_type_id": sId,
+            "field_name": fieldName,
+            "field_order": rawAddressFields.length + 1,
+          }),
+        );
+      }
       newFieldCtrl.clear();
-    });
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text("Address field '$field' added"), backgroundColor: Colors.green),
-    );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Address field '$fieldName' added successfully"), backgroundColor: Colors.green),
+      );
+    } catch (e) {
+      debugPrint("Add address field err: $e");
+    } finally {
+      await _fetchAddressFieldsAndValues(sId);
+    }
   }
 
-  void _editSavedAddress(int index) {
-    final addr = savedAddresses[index];
+  void _editSavedAddressGroup(int index) {
+    final group = savedAddressGroups[index];
     setState(() {
       editingAddressIndex = index;
-      for (var f in addressFields) {
-        if (addressFieldControllers.containsKey(f)) {
-          addressFieldControllers[f]!.text = addr[f] ?? "";
-        }
+      editingGroupId = group['group_id'];
+      editingAddressRecordIds = Map<int, int>.from(group['record_ids'] ?? {});
+
+      final vals = (group['values'] as Map?) ?? {};
+      for (var f in rawAddressFields) {
+        final fId = f['id'] as int;
+        _getControllerForField(fId).text = vals[fId]?.toString() ?? "";
       }
     });
     ScaffoldMessenger.of(context).showSnackBar(
@@ -315,35 +750,89 @@ class _StoragePageState extends State<StoragePage> {
     );
   }
 
-  void _saveOrUpdateAddress() {
-    Map<String, String> entry = {};
-    for (var f in addressFields) {
-      entry[f] = addressFieldControllers[f]?.text.trim() ?? "";
-    }
+  Future<void> _saveOrUpdateAddress() async {
+    final sId = activeStorage?['id'] as int? ?? 20;
 
-    if ((entry["Address"] ?? "").isNotEmpty || (entry["Pincode"] ?? "").isNotEmpty) {
-      setState(() {
-        if (editingAddressIndex != null) {
-          savedAddresses[editingAddressIndex!] = entry;
+    if (editingGroupId != null) {
+      // 1. UPDATE EXISTING ADDRESS: PUT /api/storage/address-value/:id
+      setState(() => isLoadingAddress = true);
+      try {
+        final headers = await _getStorageApiHeaders();
+        for (var f in rawAddressFields) {
+          final fId = f['id'] as int;
+          final val = _getControllerForField(fId).text.trim();
+          final recordId = editingAddressRecordIds[fId];
+          if (recordId != null) {
+            final url = "$_kStorageBaseUrl/storage/address-value/$recordId";
+            await http.put(
+              Uri.parse(url),
+              headers: headers,
+              body: jsonEncode({"value": val}),
+            );
+          }
+        }
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Address updated successfully"), backgroundColor: Colors.green),
+        );
+      } catch (e) {
+        debugPrint("Error updating address: $e");
+      } finally {
+        setState(() {
           editingAddressIndex = null;
-        } else {
-          savedAddresses.add(entry);
-        }
-        for (var ctrl in addressFieldControllers.values) {
-          ctrl.clear();
-        }
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Address saved successfully"), backgroundColor: Colors.green),
-      );
+          editingGroupId = null;
+          editingAddressRecordIds.clear();
+          for (var ctrl in addressFieldControllers.values) {
+            ctrl.clear();
+          }
+        });
+        await _fetchAddressFieldsAndValues(sId);
+      }
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Please enter at least Address or Pincode")),
-      );
+      // 2. CREATE NEW ADDRESS: POST /api/storage/address-value
+      List<Map<String, dynamic>> fieldsPayload = [];
+      for (var f in rawAddressFields) {
+        final fId = f['id'] as int;
+        final val = _getControllerForField(fId).text.trim();
+        fieldsPayload.add({"field_id": fId, "value": val});
+      }
+
+      setState(() => isLoadingAddress = true);
+      try {
+        final headers = await _getStorageApiHeaders();
+        final url = "$_kStorageBaseUrl/storage/address-value";
+        final res = await http.post(
+          Uri.parse(url),
+          headers: headers,
+          body: jsonEncode({
+            "storage_type_id": sId,
+            "fields": fieldsPayload,
+          }),
+        );
+        if (res.statusCode >= 200 && res.statusCode < 300) {
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text("Address values saved successfully"), backgroundColor: Colors.green),
+          );
+        }
+      } catch (e) {
+        debugPrint("Error saving address: $e");
+      } finally {
+        setState(() {
+          for (var ctrl in addressFieldControllers.values) {
+            ctrl.clear();
+          }
+        });
+        await _fetchAddressFieldsAndValues(sId);
+      }
     }
   }
 
-  void _confirmDeleteSavedAddress(int index) {
+  void _confirmDeleteSavedAddressGroup(int index) {
+    final group = savedAddressGroups[index];
+    final firstId = group['first_id'];
+    final sId = activeStorage?['id'] as int? ?? 20;
+
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -353,12 +842,24 @@ class _StoragePageState extends State<StoragePage> {
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("Cancel")),
           ElevatedButton(
-            onPressed: () {
-              setState(() => savedAddresses.removeAt(index));
+            onPressed: () async {
               Navigator.pop(ctx);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text("Address deleted"), backgroundColor: Colors.green),
-              );
+              if (firstId != null) {
+                setState(() => isLoadingAddress = true);
+                try {
+                  final headers = await _getStorageApiHeaders();
+                  final url = "$_kStorageBaseUrl/storage/address-value/$firstId";
+                  await http.delete(Uri.parse(url), headers: headers);
+                  if (!mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text("Address deleted successfully"), backgroundColor: Colors.green),
+                  );
+                } catch (e) {
+                  debugPrint("Delete address error: $e");
+                } finally {
+                  await _fetchAddressFieldsAndValues(sId);
+                }
+              }
             },
             style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFEF4444), foregroundColor: Colors.white),
             child: const Text("Delete"),
@@ -369,35 +870,77 @@ class _StoragePageState extends State<StoragePage> {
   }
 
   // =========================================================================
-  // STEP 3 ACTIONS: Structure Design Edit & Delete (Photos 2 & 3)
+  // STEP 3 ACTIONS: Structure Design Edit (PUT) & Delete (DELETE)
   // =========================================================================
   void _startEditingLevel(int index) {
     setState(() {
       editingLevelIndex = index;
       newLevelCtrl.text = structureLevels[index]['name'];
+      supportGridPartitioning = structureLevels[index]['is_partitionable'] == true;
     });
   }
 
-  void _saveOrUpdateLevel() {
+  Future<void> _saveOrUpdateLevel() async {
     final lvlName = newLevelCtrl.text.trim();
     if (lvlName.isEmpty) return;
+    final sId = activeStorage?['id'] as int? ?? 20;
 
-    setState(() {
-      if (editingLevelIndex != null) {
-        structureLevels[editingLevelIndex!]['name'] = lvlName;
-        editingLevelIndex = null;
-      } else {
-        structureLevels.add({
-          "level": structureLevels.length + 1,
-          "name": lvlName,
+    if (editingLevelIndex != null) {
+      // PUT /api/storage/structure/:id
+      final lvl = structureLevels[editingLevelIndex!];
+      final id = lvl['id'];
+      setState(() => isLoadingStructure = true);
+      try {
+        final headers = await _getStorageApiHeaders();
+        final url = "$_kStorageBaseUrl/storage/structure/$id";
+        await http.put(
+          Uri.parse(url),
+          headers: headers,
+          body: jsonEncode({
+            "name": lvlName,
+            "is_partitionable": supportGridPartitioning ? 1 : 0,
+          }),
+        );
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Structure level '$lvlName' updated successfully"), backgroundColor: Colors.green),
+        );
+      } catch (e) {
+        debugPrint("Update structure error: $e");
+      } finally {
+        setState(() {
+          editingLevelIndex = null;
+          newLevelCtrl.clear();
         });
+        await _fetchStructureLevels(sId);
       }
-      newLevelCtrl.clear();
-    });
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text("Level '$lvlName' saved successfully"), backgroundColor: Colors.green),
-    );
+    } else {
+      // POST /api/storage/structure
+      setState(() => isLoadingStructure = true);
+      try {
+        final headers = await _getStorageApiHeaders();
+        final url = "$_kStorageBaseUrl/storage/structure";
+        await http.post(
+          Uri.parse(url),
+          headers: headers,
+          body: jsonEncode({
+            "storage_type_id": sId,
+            "name": lvlName,
+            "is_partitionable": supportGridPartitioning ? 1 : 0,
+            "level_order": structureLevels.length + 1,
+          }),
+        );
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Structure level '$lvlName' added successfully"), backgroundColor: Colors.green),
+        );
+      } catch (e) {
+        debugPrint("Add structure error: $e");
+      } finally {
+        setState(() => newLevelCtrl.clear());
+        await _fetchStructureLevels(sId);
+      }
+    }
   }
 
   void _cancelEditingLevel() {
@@ -407,9 +950,12 @@ class _StoragePageState extends State<StoragePage> {
     });
   }
 
-  // Exact match to Photo 3 dialog
+  // Exact match to Photo 3 dialog: DELETE /api/storage/structure/:id
   void _confirmDeleteLevel(int index) {
     final lvl = structureLevels[index];
+    final id = lvl['id'];
+    final sId = activeStorage?['id'] as int? ?? 20;
+
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -427,22 +973,24 @@ class _StoragePageState extends State<StoragePage> {
         actionsPadding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
         actions: [
           ElevatedButton(
-            onPressed: () {
+            onPressed: () async {
               Navigator.pop(ctx);
-              setState(() {
-                structureLevels.removeAt(index);
-                // Re-index remaining levels
-                for (int i = 0; i < structureLevels.length; i++) {
-                  structureLevels[i]['level'] = i + 1;
+              if (id != null) {
+                setState(() => isLoadingStructure = true);
+                try {
+                  final headers = await _getStorageApiHeaders();
+                  final url = "$_kStorageBaseUrl/storage/structure/$id";
+                  await http.delete(Uri.parse(url), headers: headers);
+                  if (!mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text("Structure level '${lvl['name']}' deleted"), backgroundColor: Colors.green),
+                  );
+                } catch (e) {
+                  debugPrint("Delete structure error: $e");
+                } finally {
+                  await _fetchStructureLevels(sId);
                 }
-                if (editingLevelIndex == index) {
-                  editingLevelIndex = null;
-                  newLevelCtrl.clear();
-                }
-              });
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text("Structure level '${lvl['name']}' deleted"), backgroundColor: Colors.green),
-              );
+              }
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFF1E5E3A), // Dark Green OK button from Photo 3
@@ -473,18 +1021,24 @@ class _StoragePageState extends State<StoragePage> {
   // =========================================================================
   void _showAddChildLocationDialog(Map<String, dynamic> parentItem) {
     final nameCtrl = TextEditingController();
+    final sId = activeStorage?['id'] as int? ?? 20;
 
     // Dynamically find next structure level name from hierarchy
     String childLevelName = "Sub-location";
+    int? childLevelId;
     final parentLevel = parentItem['levelName']?.toString().toLowerCase();
     for (int i = 0; i < structureLevels.length; i++) {
       if (structureLevels[i]['name'].toString().toLowerCase() == parentLevel && i + 1 < structureLevels.length) {
         childLevelName = structureLevels[i + 1]['name'];
+        childLevelId = structureLevels[i + 1]['id'];
         break;
       }
     }
     if (childLevelName == "Sub-location") {
       childLevelName = (parentItem['levelName'] == "Building") ? "Floor" : "Rack";
+      if (structureLevels.length > 1) {
+        childLevelId = structureLevels[1]['id'];
+      }
     }
 
     showDialog(
@@ -531,27 +1085,34 @@ class _StoragePageState extends State<StoragePage> {
             child: const Text("Cancel"),
           ),
           ElevatedButton(
-            onPressed: () {
+            onPressed: () async {
               final name = nameCtrl.text.trim();
               if (name.isNotEmpty) {
-                final newItem = {
-                  "id": DateTime.now().millisecondsSinceEpoch,
-                  "name": name,
-                  "code": "C${(parentItem['children'] as List).length + 1}",
-                  "levelName": childLevelName,
-                  "isExpanded": true,
-                  "racks": <Map<String, dynamic>>[],
-                  "children": <Map<String, dynamic>>[],
-                };
-
-                setState(() {
-                  (parentItem['children'] as List).add(newItem);
-                  parentItem['isExpanded'] = true;
-                });
                 Navigator.pop(ctx);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text("$childLevelName added successfully"), backgroundColor: Colors.green),
-                );
+                setState(() => isLoadingLocation = true);
+                try {
+                  final headers = await _getStorageApiHeaders();
+                  final body = {
+                    "storage_type_id": sId,
+                    "parent_id": parentItem['id'],
+                    "name": name,
+                    "level_id": childLevelId,
+                  };
+                  final res = await http.post(
+                    Uri.parse("$_kStorageBaseUrl/storage/location"),
+                    headers: headers,
+                    body: jsonEncode(body),
+                  );
+                  debugPrint("Add Child Location res [${res.statusCode}]: ${res.body}");
+                  if (!mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text("$childLevelName added successfully"), backgroundColor: Colors.green),
+                  );
+                } catch (e) {
+                  debugPrint("Add Child Location error: $e");
+                } finally {
+                  await _fetchLocations(sId);
+                }
               }
             },
             style: ElevatedButton.styleFrom(
@@ -569,6 +1130,7 @@ class _StoragePageState extends State<StoragePage> {
 
   void _showAddBuildingDialog() {
     final nameCtrl = TextEditingController();
+    final sId = activeStorage?['id'] as int? ?? 20;
 
     showDialog(
       context: context,
@@ -597,20 +1159,35 @@ class _StoragePageState extends State<StoragePage> {
         actions: [
           OutlinedButton(onPressed: () => Navigator.pop(ctx), child: const Text("Cancel")),
           ElevatedButton(
-            onPressed: () {
+            onPressed: () async {
               final name = nameCtrl.text.trim();
               if (name.isNotEmpty) {
-                setState(() {
-                  locationsTree.add({
-                    "id": DateTime.now().millisecondsSinceEpoch,
-                    "name": name,
-                    "code": "B${locationsTree.length + 1}",
-                    "levelName": "Building",
-                    "isExpanded": true,
-                    "children": <Map<String, dynamic>>[],
-                  });
-                });
                 Navigator.pop(ctx);
+                setState(() => isLoadingLocation = true);
+                try {
+                  final headers = await _getStorageApiHeaders();
+                  final int? lvlId = structureLevels.isNotEmpty ? structureLevels.first['id'] : null;
+                  final body = {
+                    "storage_type_id": sId,
+                    "parent_id": null,
+                    "name": name,
+                    "level_id": lvlId,
+                  };
+                  final res = await http.post(
+                    Uri.parse("$_kStorageBaseUrl/storage/location"),
+                    headers: headers,
+                    body: jsonEncode(body),
+                  );
+                  debugPrint("Add Building res [${res.statusCode}]: ${res.body}");
+                  if (!mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text("Building '$name' added successfully"), backgroundColor: Colors.green),
+                  );
+                } catch (e) {
+                  debugPrint("Add Building error: $e");
+                } finally {
+                  await _fetchLocations(sId);
+                }
               }
             },
             style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF2563EB), foregroundColor: Colors.white),
@@ -623,6 +1200,15 @@ class _StoragePageState extends State<StoragePage> {
 
   void _showAddRackDialog(Map<String, dynamic> floorItem) {
     final nameCtrl = TextEditingController();
+    final sId = activeStorage?['id'] as int? ?? 20;
+
+    int? rackLevelId;
+    for (var lvl in structureLevels) {
+      if (lvl['name'].toString().toLowerCase().contains("rack")) {
+        rackLevelId = lvl['id'];
+        break;
+      }
+    }
 
     showDialog(
       context: context,
@@ -668,23 +1254,34 @@ class _StoragePageState extends State<StoragePage> {
             child: const Text("Cancel"),
           ),
           ElevatedButton(
-            onPressed: () {
+            onPressed: () async {
               final name = nameCtrl.text.trim();
               if (name.isNotEmpty) {
-                setState(() {
-                  if (floorItem['racks'] == null) {
-                    floorItem['racks'] = <Map<String, dynamic>>[];
-                  }
-                  (floorItem['racks'] as List).add({
-                    "id": DateTime.now().millisecondsSinceEpoch,
-                    "name": name,
-                  });
-                  floorItem['isExpanded'] = true;
-                });
                 Navigator.pop(ctx);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text("Rack '$name' added"), backgroundColor: Colors.green),
-                );
+                setState(() => isLoadingLocation = true);
+                try {
+                  final headers = await _getStorageApiHeaders();
+                  final body = {
+                    "storage_type_id": sId,
+                    "parent_id": floorItem['id'],
+                    "name": name,
+                    "level_id": rackLevelId,
+                  };
+                  final res = await http.post(
+                    Uri.parse("$_kStorageBaseUrl/storage/location"),
+                    headers: headers,
+                    body: jsonEncode(body),
+                  );
+                  debugPrint("Add Rack res [${res.statusCode}]: ${res.body}");
+                  if (!mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text("Rack '$name' added successfully"), backgroundColor: Colors.green),
+                  );
+                } catch (e) {
+                  debugPrint("Add Rack error: $e");
+                } finally {
+                  await _fetchLocations(sId);
+                }
               }
             },
             style: ElevatedButton.styleFrom(
@@ -703,6 +1300,7 @@ class _StoragePageState extends State<StoragePage> {
   void _showEditRackDialog(Map<String, dynamic> floorItem, int rackIdx) {
     final rack = (floorItem['racks'] as List)[rackIdx];
     final nameCtrl = TextEditingController(text: rack['name']);
+    final sId = activeStorage?['id'] as int? ?? 20;
 
     showDialog(
       context: context,
@@ -734,16 +1332,30 @@ class _StoragePageState extends State<StoragePage> {
         actions: [
           OutlinedButton(onPressed: () => Navigator.pop(ctx), child: const Text("Cancel")),
           ElevatedButton(
-            onPressed: () {
+            onPressed: () async {
               final name = nameCtrl.text.trim();
               if (name.isNotEmpty) {
-                setState(() {
-                  rack['name'] = name;
-                });
                 Navigator.pop(ctx);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text("Rack '$name' updated"), backgroundColor: Colors.green),
-                );
+                setState(() => isLoadingLocation = true);
+                try {
+                  final headers = await _getStorageApiHeaders();
+                  final id = rack['id'];
+                  if (id != null) {
+                    await http.put(
+                      Uri.parse("$_kStorageBaseUrl/storage/location/$id"),
+                      headers: headers,
+                      body: jsonEncode({"name": name}),
+                    );
+                  }
+                  if (!mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text("Rack '$name' updated"), backgroundColor: Colors.green),
+                  );
+                } catch (e) {
+                  debugPrint("Update rack error: $e");
+                } finally {
+                  await _fetchLocations(sId);
+                }
               }
             },
             style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF2563EB), foregroundColor: Colors.white),
@@ -756,6 +1368,7 @@ class _StoragePageState extends State<StoragePage> {
 
   void _showEditLocationDialog(Map<String, dynamic> item) {
     final nameCtrl = TextEditingController(text: item['name']);
+    final sId = activeStorage?['id'] as int? ?? 20;
 
     showDialog(
       context: context,
@@ -782,14 +1395,29 @@ class _StoragePageState extends State<StoragePage> {
         actions: [
           OutlinedButton(onPressed: () => Navigator.pop(ctx), child: const Text("Cancel")),
           ElevatedButton(
-            onPressed: () {
+            onPressed: () async {
               final newName = nameCtrl.text.trim();
               if (newName.isNotEmpty) {
-                setState(() => item['name'] = newName);
                 Navigator.pop(ctx);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text("Location updated"), backgroundColor: Colors.green),
-                );
+                setState(() => isLoadingLocation = true);
+                try {
+                  final headers = await _getStorageApiHeaders();
+                  final id = item['id'];
+                  final res = await http.put(
+                    Uri.parse("$_kStorageBaseUrl/storage/location/$id"),
+                    headers: headers,
+                    body: jsonEncode({"name": newName}),
+                  );
+                  debugPrint("Update location res [${res.statusCode}]: ${res.body}");
+                  if (!mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text("Location updated successfully"), backgroundColor: Colors.green),
+                  );
+                } catch (e) {
+                  debugPrint("Update location error: $e");
+                } finally {
+                  await _fetchLocations(sId);
+                }
               }
             },
             style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF2563EB), foregroundColor: Colors.white),
@@ -800,17 +1428,9 @@ class _StoragePageState extends State<StoragePage> {
     );
   }
 
-  void _deleteLocationRecursive(List<Map<String, dynamic>> list, int targetId) {
-    list.removeWhere((item) {
-      if (item['id'] == targetId) return true;
-      if (item['children'] != null) {
-        _deleteLocationRecursive((item['children'] as List).cast<Map<String, dynamic>>(), targetId);
-      }
-      return false;
-    });
-  }
-
   void _confirmDeleteLocation(Map<String, dynamic> item) {
+    final sId = activeStorage?['id'] as int? ?? 20;
+
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -820,14 +1440,26 @@ class _StoragePageState extends State<StoragePage> {
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("Cancel")),
           ElevatedButton(
-            onPressed: () {
-              setState(() {
-                _deleteLocationRecursive(locationsTree, item['id']);
-              });
+            onPressed: () async {
               Navigator.pop(ctx);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text("Location deleted"), backgroundColor: Colors.green),
-              );
+              setState(() => isLoadingLocation = true);
+              try {
+                final headers = await _getStorageApiHeaders();
+                final id = item['id'];
+                final res = await http.delete(
+                  Uri.parse("$_kStorageBaseUrl/storage/location/$id"),
+                  headers: headers,
+                );
+                debugPrint("Delete location res [${res.statusCode}]: ${res.body}");
+                if (!mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text("Location deleted successfully"), backgroundColor: Colors.green),
+                );
+              } catch (e) {
+                debugPrint("Delete location error: $e");
+              } finally {
+                await _fetchLocations(sId);
+              }
             },
             style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFEF4444), foregroundColor: Colors.white),
             child: const Text("Delete"),
@@ -966,6 +1598,17 @@ class _StoragePageState extends State<StoragePage> {
       onTap: () {
         if (stepNumber == 1 || activeStorage != null) {
           setState(() => currentStep = stepNumber);
+          if (activeStorage != null) {
+            final sId = activeStorage!['id'] as int? ?? 20;
+            if (stepNumber == 2) {
+              _fetchAddressFieldsAndValues(sId);
+            } else if (stepNumber == 3) {
+              _fetchStructureLevels(sId);
+            } else if (stepNumber == 4) {
+              _fetchLocations(sId);
+              _fetchStructureLevels(sId);
+            }
+          }
         }
       },
       child: Container(
@@ -1056,92 +1699,95 @@ class _StoragePageState extends State<StoragePage> {
           ),
           const SizedBox(height: 24),
 
-          Wrap(
-            spacing: 16,
-            runSpacing: 16,
-            children: storages.map((item) {
-              return Container(
-                width: 270,
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: const Color(0xFFE2E8F0)),
-                  boxShadow: [
-                    BoxShadow(color: Colors.black.withValues(alpha: 0.02), blurRadius: 6, offset: const Offset(0, 2)),
-                  ],
-                ),
-                child: Column(
-                  children: [
-                    // Edit & Delete icons on top right (Photo 1)
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        IconButton(
-                          icon: const Icon(Icons.edit_outlined, size: 16, color: Color(0xFFF59E0B)),
-                          onPressed: () => _showEditStorageDialog(item),
-                          constraints: const BoxConstraints(),
-                          padding: const EdgeInsets.symmetric(horizontal: 4),
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.delete_outline_rounded, size: 16, color: Color(0xFFEF4444)),
-                          onPressed: () => _confirmDeleteStorage(item),
-                          constraints: const BoxConstraints(),
-                          padding: const EdgeInsets.symmetric(horizontal: 4),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-
-                    Container(
-                      width: 58,
-                      height: 58,
-                      decoration: const BoxDecoration(
-                        color: Color(0xFF2563EB),
-                        shape: BoxShape.circle,
+          if (isLoadingStorage)
+            const Center(
+              child: Padding(
+                padding: EdgeInsets.all(32),
+                child: CircularProgressIndicator(),
+              ),
+            )
+          else
+            Wrap(
+              spacing: 16,
+              runSpacing: 16,
+              children: storages.map((item) {
+                return Container(
+                  width: 270,
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                    boxShadow: [
+                      BoxShadow(color: Colors.black.withValues(alpha: 0.02), blurRadius: 6, offset: const Offset(0, 2)),
+                    ],
+                  ),
+                  child: Column(
+                    children: [
+                      // Edit & Delete icons on top right (Photo 1)
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          IconButton(
+                            icon: const Icon(Icons.edit_outlined, size: 16, color: Color(0xFFF59E0B)),
+                            onPressed: () => _showEditStorageDialog(item),
+                            constraints: const BoxConstraints(),
+                            padding: const EdgeInsets.symmetric(horizontal: 4),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.delete_outline_rounded, size: 16, color: Color(0xFFEF4444)),
+                            onPressed: () => _confirmDeleteStorage(item),
+                            constraints: const BoxConstraints(),
+                            padding: const EdgeInsets.symmetric(horizontal: 4),
+                          ),
+                        ],
                       ),
-                      child: const Icon(Icons.dns_rounded, color: Colors.white, size: 28),
-                    ),
-                    const SizedBox(height: 14),
+                      const SizedBox(height: 8),
 
-                    Text(
-                      item['name'],
-                      style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A)),
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 4),
-
-                    Text(
-                      item['desc'],
-                      style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B)),
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 20),
-
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        onPressed: () {
-                          setState(() {
-                            activeStorage = item;
-                            currentStep = 2; // Advance to Step 2!
-                          });
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF2563EB),
-                          foregroundColor: Colors.white,
-                          elevation: 0,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                          padding: const EdgeInsets.symmetric(vertical: 11),
+                      Container(
+                        width: 58,
+                        height: 58,
+                        decoration: const BoxDecoration(
+                          color: Color(0xFF2563EB),
+                          shape: BoxShape.circle,
                         ),
-                        child: Text("Select", style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold)),
+                        child: const Icon(Icons.dns_rounded, color: Colors.white, size: 28),
                       ),
-                    ),
-                  ],
-                ),
-              );
-            }).toList(),
-          ),
+                      const SizedBox(height: 14),
+
+                      Text(
+                        item['name'],
+                        style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A)),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 4),
+
+                      Text(
+                        item['desc'],
+                        style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B)),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 20),
+
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          onPressed: () => _onSelectStorage(item),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF2563EB),
+                            foregroundColor: Colors.white,
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                            padding: const EdgeInsets.symmetric(vertical: 11),
+                          ),
+                          child: Text("Select", style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold)),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }).toList(),
+            ),
         ],
       ),
     );
@@ -1221,7 +1867,10 @@ class _StoragePageState extends State<StoragePage> {
                       ),
                       items: [
                         const DropdownMenuItem(value: "At the end", child: Text("At the end", style: TextStyle(fontSize: 12))),
-                        ...addressFields.map((f) => DropdownMenuItem(value: f, child: Text(f, style: const TextStyle(fontSize: 12)))),
+                        ...rawAddressFields.map((f) => DropdownMenuItem(
+                              value: f['field_name']?.toString() ?? "",
+                              child: Text(f['field_name']?.toString() ?? "", style: const TextStyle(fontSize: 12)),
+                            )),
                       ],
                       onChanged: (val) => setState(() => insertAfterSelection = val ?? "At the end"),
                     ),
@@ -1283,9 +1932,11 @@ class _StoragePageState extends State<StoragePage> {
                 SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
                   child: Row(
-                    children: addressFields.asMap().entries.map((entry) {
+                    children: rawAddressFields.asMap().entries.map((entry) {
                       final idx = entry.key;
-                      final name = entry.value;
+                      final f = entry.value;
+                      final name = (f['field_name'] ?? "").toString();
+                      final order = f['field_order'] ?? (idx + 1);
 
                       return Row(
                         children: [
@@ -1304,7 +1955,7 @@ class _StoragePageState extends State<StoragePage> {
                                     Container(width: 4, height: 4, decoration: const BoxDecoration(color: Colors.grey, shape: BoxShape.circle)),
                                     const SizedBox(width: 4),
                                     Text(
-                                      "ORDER: ${idx + 1}",
+                                      "ORDER: $order",
                                       style: GoogleFonts.inter(fontSize: 9, fontWeight: FontWeight.bold, color: const Color(0xFF64748B)),
                                     ),
                                   ],
@@ -1317,7 +1968,7 @@ class _StoragePageState extends State<StoragePage> {
                               ],
                             ),
                           ),
-                          if (idx < addressFields.length - 1)
+                          if (idx < rawAddressFields.length - 1)
                             Padding(
                               padding: const EdgeInsets.symmetric(horizontal: 8),
                               child: Text("—", style: TextStyle(color: Colors.grey.shade400)),
@@ -1349,137 +2000,155 @@ class _StoragePageState extends State<StoragePage> {
           ),
           const SizedBox(height: 16),
 
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final isNarrow = constraints.maxWidth < 550;
-
-              return Column(
-                children: [
-                  for (int i = 0; i < addressFields.length; i += 2)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 12),
-                      child: isNarrow
-                          ? Column(
-                              children: [
-                                _buildAddressValueInput(addressFields[i]),
-                                if (i + 1 < addressFields.length) ...[
-                                  const SizedBox(height: 12),
-                                  _buildAddressValueInput(addressFields[i + 1]),
-                                ],
-                              ],
-                            )
-                          : Row(
-                              children: [
-                                Expanded(child: _buildAddressValueInput(addressFields[i])),
-                                const SizedBox(width: 14),
-                                if (i + 1 < addressFields.length)
-                                  Expanded(child: _buildAddressValueInput(addressFields[i + 1]))
-                                else
-                                  const Expanded(child: SizedBox()),
-                              ],
-                            ),
-                    ),
-                ],
-              );
-            },
-          ),
-          const SizedBox(height: 16),
-
-          // Saved Addresses Box with Edit & Delete actions
-          Text("Saved Addresses", style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.bold, color: const Color(0xFF475569))),
-          const SizedBox(height: 8),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: const Color(0xFFE2E8F0)),
-            ),
-            child: Column(
-              children: savedAddresses.asMap().entries.map((entry) {
-                final idx = entry.key;
-                final addr = entry.value;
-
-                return Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 4.0),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text("Address: ${addr['Address']}", style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A))),
-                            if ((addr['Pincode'] ?? '').isNotEmpty)
-                              Text("Pincode: ${addr['Pincode']}", style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B))),
-                          ],
-                        ),
-                      ),
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          IconButton(
-                            icon: const Icon(Icons.edit_outlined, size: 16, color: Color(0xFF2563EB)),
-                            onPressed: () => _editSavedAddress(idx),
-                            constraints: const BoxConstraints(),
-                            padding: const EdgeInsets.all(4),
-                          ),
-                          IconButton(
-                            icon: const Icon(Icons.delete_outline_rounded, size: 16, color: Color(0xFFEF4444)),
-                            onPressed: () => _confirmDeleteSavedAddress(idx),
-                            constraints: const BoxConstraints(),
-                            padding: const EdgeInsets.all(4),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                );
-              }).toList(),
-            ),
-          ),
-          const SizedBox(height: 12),
-
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              ElevatedButton.icon(
-                onPressed: _saveOrUpdateAddress,
-                icon: const Icon(Icons.save_outlined, size: 14, color: Colors.white),
-                label: Text(
-                  editingAddressIndex != null ? "Update Address" : "Save Address",
-                  style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
-                ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF2563EB),
-                  foregroundColor: Colors.white,
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                ),
+          if (isLoadingAddress)
+            const Center(
+              child: Padding(
+                padding: EdgeInsets.all(24),
+                child: CircularProgressIndicator(),
               ),
-              if (editingAddressIndex != null)
-                OutlinedButton(
-                  onPressed: () {
-                    setState(() {
-                      editingAddressIndex = null;
-                      for (var ctrl in addressFieldControllers.values) {
-                        ctrl.clear();
-                      }
-                    });
-                  },
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: const Color(0xFF64748B),
-                    side: const BorderSide(color: Color(0xFFCBD5E1)),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            )
+          else ...[
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final isNarrow = constraints.maxWidth < 550;
+
+                return Column(
+                  children: [
+                    for (int i = 0; i < rawAddressFields.length; i += 2)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: isNarrow
+                            ? Column(
+                                children: [
+                                  _buildAddressValueInput(rawAddressFields[i]),
+                                  if (i + 1 < rawAddressFields.length) ...[
+                                    const SizedBox(height: 12),
+                                    _buildAddressValueInput(rawAddressFields[i + 1]),
+                                  ],
+                                ],
+                              )
+                            : Row(
+                                children: [
+                                  Expanded(child: _buildAddressValueInput(rawAddressFields[i])),
+                                  const SizedBox(width: 14),
+                                  if (i + 1 < rawAddressFields.length)
+                                    Expanded(child: _buildAddressValueInput(rawAddressFields[i + 1]))
+                                  else
+                                    const Expanded(child: SizedBox()),
+                                ],
+                              ),
+                      ),
+                  ],
+                );
+              },
+            ),
+            const SizedBox(height: 16),
+
+            // Saved Addresses Box with Edit & Delete actions
+            Text("Saved Addresses", style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.bold, color: const Color(0xFF475569))),
+            const SizedBox(height: 8),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+              ),
+              child: savedAddressGroups.isEmpty
+                  ? Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: Center(
+                        child: Text("No saved addresses yet.", style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF94A3B8))),
+                      ),
+                    )
+                  : Column(
+                      children: savedAddressGroups.asMap().entries.map((entry) {
+                        final idx = entry.key;
+                        final addr = entry.value;
+
+                        return Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 4.0),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text("Address: ${addr['Address'] ?? ''}", style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A))),
+                                    if ((addr['Pincode'] ?? '').toString().isNotEmpty)
+                                      Text("Pincode: ${addr['Pincode']}", style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B))),
+                                  ],
+                                ),
+                              ),
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  IconButton(
+                                    icon: const Icon(Icons.edit_outlined, size: 16, color: Color(0xFF2563EB)),
+                                    onPressed: () => _editSavedAddressGroup(idx),
+                                    constraints: const BoxConstraints(),
+                                    padding: const EdgeInsets.all(4),
+                                  ),
+                                  IconButton(
+                                    icon: const Icon(Icons.delete_outline_rounded, size: 16, color: Color(0xFFEF4444)),
+                                    onPressed: () => _confirmDeleteSavedAddressGroup(idx),
+                                    constraints: const BoxConstraints(),
+                                    padding: const EdgeInsets.all(4),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        );
+                      }).toList(),
+                    ),
+            ),
+            const SizedBox(height: 12),
+
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                ElevatedButton.icon(
+                  onPressed: _saveOrUpdateAddress,
+                  icon: const Icon(Icons.save_outlined, size: 14, color: Colors.white),
+                  label: Text(
+                    editingAddressIndex != null ? "Update Address" : "Save Address",
+                    style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
                   ),
-                  child: const Text("Cancel Edit"),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF2563EB),
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  ),
                 ),
-            ],
-          ),
+                if (editingAddressIndex != null)
+                  OutlinedButton(
+                    onPressed: () {
+                      setState(() {
+                        editingAddressIndex = null;
+                        editingGroupId = null;
+                        editingAddressRecordIds.clear();
+                        for (var ctrl in addressFieldControllers.values) {
+                          ctrl.clear();
+                        }
+                      });
+                    },
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: const Color(0xFF64748B),
+                      side: const BorderSide(color: Color(0xFFCBD5E1)),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    ),
+                    child: const Text("Cancel Edit"),
+                  ),
+              ],
+            ),
+          ],
           const SizedBox(height: 28),
 
           Wrap(
@@ -1498,7 +2167,12 @@ class _StoragePageState extends State<StoragePage> {
                 child: Text("Previous Step", style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold)),
               ),
               ElevatedButton(
-                onPressed: () => setState(() => currentStep = 3),
+                onPressed: () {
+                  setState(() => currentStep = 3);
+                  if (activeStorage != null) {
+                    _fetchStructureLevels(activeStorage!['id'] as int? ?? 20);
+                  }
+                },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF2563EB),
                   foregroundColor: Colors.white,
@@ -1515,10 +2189,11 @@ class _StoragePageState extends State<StoragePage> {
     );
   }
 
-  Widget _buildAddressValueInput(String fieldName) {
-    if (!addressFieldControllers.containsKey(fieldName)) {
-      addressFieldControllers[fieldName] = TextEditingController();
-    }
+  Widget _buildAddressValueInput(Map<String, dynamic> field) {
+    final fId = field['id'] as int;
+    final fieldName = (field['field_name'] ?? "").toString();
+    final ctrl = _getControllerForField(fId);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1527,7 +2202,7 @@ class _StoragePageState extends State<StoragePage> {
         SizedBox(
           height: 38,
           child: TextField(
-            controller: addressFieldControllers[fieldName],
+            controller: ctrl,
             style: GoogleFonts.inter(fontSize: 12),
             decoration: InputDecoration(
               contentPadding: const EdgeInsets.symmetric(horizontal: 12),
@@ -1778,7 +2453,14 @@ class _StoragePageState extends State<StoragePage> {
                 child: Text("Previous Step", style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold)),
               ),
               ElevatedButton(
-                onPressed: () => setState(() => currentStep = 4),
+                onPressed: () {
+                  setState(() => currentStep = 4);
+                  if (activeStorage != null) {
+                    final sId = activeStorage!['id'] as int? ?? 20;
+                    _fetchLocations(sId);
+                    _fetchStructureLevels(sId);
+                  }
+                },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF2563EB),
                   foregroundColor: Colors.white,

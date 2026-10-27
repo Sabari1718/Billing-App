@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:async';
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 
 import 'package:billingapp/bussinjessscreate/complete%20setup.dart';
 import 'package:billingapp/bussinjessscreate/shop%20select.dart';
@@ -8,8 +9,6 @@ import 'package:billingapp/models/category%20grou0p.dart';
 
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:billingapp/utils/app_logger.dart';
-
 import 'package:billingapp/utils/app_logger.dart';
 
 class ApiService {
@@ -71,6 +70,7 @@ class ApiService {
     final headers = {
       "Accept": "application/json",
       "Content-Type": "application/json",
+      "X-App-ID": "Product94674",
     };
 
     if (auth) {
@@ -84,6 +84,7 @@ class ApiService {
 
     return headers;
   }
+
 
   /// ✅ HANDLE RESPONSE (🔥 IMPORTANT FIX)
   static Map<String, dynamic> _handleResponse(http.Response res) {
@@ -150,39 +151,91 @@ class ApiService {
 
   /// ✅ SELECT BUSINESS
   static Future<Map<String, dynamic>> selectBusiness(Map data) async {
-    final res = await http.post(
-      Uri.parse("$baseUrl/auth/select-business"),
-      headers: await _getHeaders(auth: true),
-      body: jsonEncode(data),
-    );
+    const url = "/auth/select-business";
+    try {
+      _logApiRequest("SELECT BUSINESS", "POST", url);
+      final res = await http.post(
+        Uri.parse("$baseUrl$url"),
+        headers: await _getHeaders(auth: true),
+        body: jsonEncode(data),
+      );
+      final success = res.statusCode >= 200 && res.statusCode < 300;
+      _logApiResponse("SELECT BUSINESS", res.statusCode, res.body, success: success);
 
-    final response = _handleResponse(res);
+      final response = _handleResponse(res);
 
-    if (response["data"] != null) {
-      final prefs = await SharedPreferences.getInstance();
-      final businessData = response["data"];
+      if (response["data"] != null) {
+        final prefs = await SharedPreferences.getInstance();
+        final businessData = response["data"];
 
-      if (businessData["token"] != null) {
-        await prefs.setString("auth_token", businessData["token"]);
+        if (businessData["token"] != null) {
+          final tokenStr = businessData["token"].toString();
+          await prefs.setString("auth_token", tokenStr);
+          await prefs.setString("billing_auth_token", tokenStr);
+          await prefs.setString("token", tokenStr);
+        }
+
+        final bId = businessData["business_id"] ?? data["business_id"];
+        if (bId != null && bId.toString() != "null" && bId.toString().isNotEmpty) {
+          final bIdStr = bId.toString();
+          await prefs.setString("selected_business_id", bIdStr);
+          await prefs.setString("business_id", bIdStr);
+          try {
+            await prefs.setInt("business_id_int", int.parse(bIdStr));
+          } catch (_) {}
+        }
+
+        if (businessData["user_main_id"] != null) {
+          await prefs.setString("user_main_id", businessData["user_main_id"].toString());
+        }
+
+        if (businessData["type"] != null) {
+          await prefs.setString("business_type", businessData["type"].toString());
+          await prefs.setString("role", businessData["type"].toString()); // Sync role for existing logic
+        }
       }
 
-      if (businessData["business_id"] != null) {
-        await prefs.setString("selected_business_id", businessData["business_id"].toString());
-        // Backward compatibility
-        await prefs.setInt("business_id", int.parse(businessData["business_id"].toString()));
-      }
-
-      if (businessData["user_main_id"] != null) {
-        await prefs.setString("user_main_id", businessData["user_main_id"].toString());
-      }
-
-      if (businessData["type"] != null) {
-        await prefs.setString("business_type", businessData["type"].toString());
-        await prefs.setString("role", businessData["type"].toString()); // Sync role for existing logic
-      }
+      return response;
+    } catch (e, stackTrace) {
+      _logApiError("Select Business API", "POST", url, e, stackTrace);
+      rethrow;
     }
+  }
 
-    return response;
+  /// ✅ GET PLATFORMS FOR BUSINESS
+  static Future<Map<String, dynamic>> getPlatforms({required String businessId}) async {
+    final url = "/platform?businessId=$businessId";
+    try {
+      _logApiRequest("GET PLATFORMS", "GET", url);
+      final res = await http.get(
+        Uri.parse("$baseUrl$url"),
+        headers: await _getHeaders(auth: true),
+      );
+      final success = res.statusCode >= 200 && res.statusCode < 300;
+      _logApiResponse("GET PLATFORMS", res.statusCode, res.body, success: success);
+      return _handleResponse(res);
+    } catch (e, stackTrace) {
+      _logApiError("Get Platforms API", "GET", url, e, stackTrace);
+      return {};
+    }
+  }
+
+  /// ✅ GET SALES BILLS
+  static Future<Map<String, dynamic>> getSalesBills() async {
+    const url = "/sales/bills";
+    try {
+      _logApiRequest("GET SALES BILLS", "GET", url);
+      final res = await http.get(
+        Uri.parse("$baseUrl$url"),
+        headers: await _getHeaders(auth: true),
+      );
+      final success = res.statusCode >= 200 && res.statusCode < 300;
+      _logApiResponse("GET SALES BILLS", res.statusCode, res.body, success: success);
+      return _handleResponse(res);
+    } catch (e, stackTrace) {
+      _logApiError("Get Sales Bills API", "GET", url, e, stackTrace);
+      return {};
+    }
   }
 
   /// ✅ CATEGORY GROUPS
@@ -605,13 +658,15 @@ class ApiService {
     try {
       final headers = await _getHeaders(auth: true);
       final prefs = await SharedPreferences.getInstance();
-      final raw = prefs.get("business_id");
-      final int setupId = raw is int ? raw : int.tryParse(raw.toString()) ?? 0;
-
-      if (setupId == 0) return false;
+      final raw = prefs.get("selected_business_id") ?? prefs.get("business_id") ?? "52";
+      final int setupId = raw is int ? raw : int.tryParse(raw.toString()) ?? 52;
+      final storeIdStr = prefs.getString("selected_store_id") ?? prefs.get("store_id")?.toString() ?? "38";
+      final int storeId = int.tryParse(storeIdStr) ?? 38;
 
       final body = {
         "setup_id": setupId,
+        "business_id": setupId,
+        "store_id": storeId,
         "category_group_id": categoryGroupId,
         "category_id": categoryId,
         "brand_id": brandId,
@@ -656,12 +711,16 @@ class ApiService {
     try {
       final headers = await _getHeaders(auth: true);
       final prefs = await SharedPreferences.getInstance();
-      final raw = prefs.get("business_id");
-      final int setupId = raw is int ? raw : int.tryParse(raw.toString()) ?? 0;
+      final raw = prefs.get("selected_business_id") ?? prefs.get("business_id") ?? "52";
+      final int setupId = raw is int ? raw : int.tryParse(raw.toString()) ?? 52;
+      final storeIdStr = prefs.getString("selected_store_id") ?? prefs.get("store_id")?.toString() ?? "38";
+      final int storeId = int.tryParse(storeIdStr) ?? 38;
 
       final body = {
         "allocation_id": id,
         "setup_id": setupId,
+        "business_id": setupId,
+        "store_id": storeId,
         "category_group_id": categoryGroupId,
         "category_id": categoryId,
         "brand_id": brandId,
@@ -1454,4 +1513,310 @@ class ApiService {
       return {};
     }
   }
+
+  /// ✅ GET STORES
+  /// Request: GET https://billing.srivagroups.in/api/store?business_id=52&businessId=52&platform_id=1&platformId=1
+  static Future<Map<String, dynamic>> getStores({
+    String? businessId,
+    String? platformId,
+  }) async {
+    final prefs = await SharedPreferences.getInstance();
+    final bId = businessId ??
+        prefs.getString("selected_business_id") ??
+        prefs.get("business_id")?.toString() ??
+        "52";
+    final pId = platformId ??
+        prefs.getString("selected_platform_id") ??
+        prefs.get("platform_id")?.toString() ??
+        "1";
+
+    final url =
+        "/store?business_id=$bId&businessId=$bId&platform_id=$pId&platformId=$pId";
+
+    try {
+      _logApiRequest("GET STORES", "GET", url);
+      final res = await http.get(
+        Uri.parse("$baseUrl$url"),
+        headers: await _getHeaders(auth: true),
+      );
+
+      final success = res.statusCode >= 200 && res.statusCode < 300;
+      _logApiResponse("GET STORES", res.statusCode, res.body, success: success);
+
+      final response = _handleResponse(res);
+
+      if (response["success"] == true &&
+          response["data"] is List &&
+          (response["data"] as List).isNotEmpty) {
+        final firstStore = response["data"][0];
+        if (firstStore["store_id"] != null) {
+          await prefs.setString(
+              "selected_store_id", firstStore["store_id"].toString());
+          await prefs.setInt(
+              "store_id", int.tryParse(firstStore["store_id"].toString()) ?? 0);
+        }
+        if (firstStore["store_name"] != null) {
+          await prefs.setString(
+              "selected_store_name", firstStore["store_name"].toString());
+        }
+      }
+
+      return response;
+    } catch (e, stackTrace) {
+      _logApiError("Get Stores API", "GET", url, e, stackTrace);
+      return {};
+    }
+  }
+
+  /// ✅ GET PRODUCT ENTRY STORE SETUP
+  /// Request: GET https://billing.srivagroups.in/api/product-entry/store-setup?userId=4995251182&businessId=52&platformId=1&storeId=38
+  static Future<Map<String, dynamic>> getProductEntryStoreSetup({
+    String? userId,
+    String? businessId,
+    String? platformId,
+    String? storeId,
+  }) async {
+    final prefs = await SharedPreferences.getInstance();
+    final uId = userId ??
+        prefs.getString("user_main_id") ??
+        prefs.getString("user_id") ??
+        prefs.get("user_id")?.toString() ??
+        "4995251182";
+    final bId = businessId ??
+        prefs.getString("selected_business_id") ??
+        prefs.get("business_id")?.toString() ??
+        "52";
+    final pId = platformId ??
+        prefs.getString("selected_platform_id") ??
+        prefs.get("platform_id")?.toString() ??
+        "1";
+    final sId = storeId ??
+        prefs.getString("selected_store_id") ??
+        prefs.get("store_id")?.toString() ??
+        "38";
+
+    final url =
+        "/product-entry/store-setup?userId=$uId&businessId=$bId&platformId=$pId&storeId=$sId";
+
+    try {
+      _logApiRequest("GET PRODUCT ENTRY STORE SETUP", "GET", url);
+      final res = await http.get(
+        Uri.parse("$baseUrl$url"),
+        headers: await _getHeaders(auth: true),
+      );
+
+      final success = res.statusCode >= 200 && res.statusCode < 300;
+      _logApiResponse("GET PRODUCT ENTRY STORE SETUP", res.statusCode, res.body, success: success);
+
+      return _handleResponse(res);
+    } catch (e, stackTrace) {
+      _logApiError("Get Product Entry Store Setup API", "GET", url, e, stackTrace);
+      return {};
+    }
+  }
+
+  /// ✅ GET STORE SETUP (Backward-compatible alias)
+  static Future<Map<String, dynamic>> getStoreSetup({
+    String? userId,
+    String? businessId,
+    String? platformId,
+    String? storeId,
+  }) async {
+    return getProductEntryStoreSetup(
+      userId: userId,
+      businessId: businessId,
+      platformId: platformId,
+      storeId: storeId,
+    );
+  }
+
+  /// ✅ GET CATEGORY LIST
+  /// Request: GET https://srivagroups.in/api/category/list
+  static Future<Map<String, dynamic>> getCategoryList() async {
+    const srivaUrl = "https://srivagroups.in/api/category/list";
+    try {
+      _logApiRequest("GET CATEGORY LIST", "GET", srivaUrl);
+      final headers = {
+        "Accept": "application/json",
+        "Content-Type": "application/json",
+        "X-App-ID": "Product94674",
+      };
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        final token = prefs.getString("billing_auth_token") ?? prefs.getString("auth_token");
+        if (token != null && token.isNotEmpty) {
+          headers["Authorization"] = token.startsWith("Bearer ") ? token : "Bearer $token";
+        }
+      } catch (_) {}
+
+      final res = await http.get(
+        Uri.parse(srivaUrl),
+        headers: headers,
+      ).timeout(const Duration(seconds: 12));
+
+      debugPrint("getCategoryList [${res.statusCode}]: ${res.body.length} chars");
+      if (res.statusCode >= 200 && res.statusCode < 300) {
+        _logApiResponse("GET CATEGORY LIST (srivagroups.in)", res.statusCode, res.body, success: true);
+        final decoded = jsonDecode(res.body);
+        if (decoded is Map<String, dynamic>) return decoded;
+        if (decoded is List) return {"success": true, "data": decoded};
+      }
+    } catch (e) {
+      debugPrint("Direct srivagroups.in getCategoryList failed: $e");
+    }
+
+    // Direct fallback with minimal headers
+    try {
+      final res = await http.get(
+        Uri.parse(srivaUrl),
+        headers: {
+          "Accept": "application/json",
+          "X-App-ID": "Product94674",
+        },
+      ).timeout(const Duration(seconds: 10));
+
+      if (res.statusCode >= 200 && res.statusCode < 300) {
+        final decoded = jsonDecode(res.body);
+        if (decoded is Map<String, dynamic>) return decoded;
+        if (decoded is List) return {"success": true, "data": decoded};
+      }
+    } catch (e) {
+      debugPrint("getCategoryList fallback error: $e");
+    }
+
+    return {};
+  }
+
+  /// ✅ GET PRODUCTS BY BRAND ID
+  /// Request: GET https://billing.srivagroups.in/api/products/{brandId}
+  static Future<Map<String, dynamic>> getProductsByBrandId(dynamic brandId) async {
+    final url = "https://billing.srivagroups.in/api/products/$brandId";
+    try {
+      _logApiRequest("GET PRODUCTS BY BRAND ID", "GET", url);
+      final headers = await _getHeaders(auth: true);
+      headers["X-App-ID"] = "Product94674";
+      final res = await http.get(Uri.parse(url), headers: headers).timeout(const Duration(seconds: 10));
+      debugPrint("getProductsByBrandId [$url] [${res.statusCode}]: ${res.body.length} chars");
+      if (res.statusCode >= 200 && res.statusCode < 300) {
+        final decoded = jsonDecode(res.body);
+        if (decoded is Map<String, dynamic>) return decoded;
+        if (decoded is List) return {"success": true, "products": decoded};
+      }
+    } catch (e) {
+      debugPrint("getProductsByBrandId error: $e");
+    }
+    return {};
+  }
+
+  /// ✅ GET BRANDS BY CATEGORY
+  /// Request: GET https://srivagroups.in/api/brand/{categoryId}?userId=...&businessId=...&platformId=...&storeId=...
+  static Future<Map<String, dynamic>> getBrandsByCategory({
+    required dynamic categoryId,
+    String? userId,
+    String? businessId,
+    String? platformId,
+    String? storeId,
+  }) async {
+    final prefs = await SharedPreferences.getInstance();
+    final effectiveUserId = userId ?? prefs.getString("userId") ?? prefs.getString("user_id") ?? "4995251182";
+    final effectiveBusinessId = businessId ?? prefs.getString("selected_business_id") ?? prefs.getString("businessId") ?? "52";
+    final effectivePlatformId = platformId ?? prefs.getString("selected_platform_id") ?? prefs.getString("platformId") ?? "1";
+    final effectiveStoreId = storeId ?? prefs.getString("selected_store_id") ?? prefs.getString("storeId") ?? "38";
+
+    final query = "userId=$effectiveUserId&businessId=$effectiveBusinessId&platformId=$effectivePlatformId&storeId=$effectiveStoreId";
+    final srivaUrl = "https://srivagroups.in/api/brand/$categoryId?$query";
+    final billingUrl = "$baseUrl/brand/$categoryId?$query";
+
+    final headers = await _getHeaders(auth: true);
+    headers["X-App-ID"] = "Product94674";
+
+    try {
+      _logApiRequest("GET BRANDS BY CATEGORY", "GET", srivaUrl);
+      final res = await http.get(Uri.parse(srivaUrl), headers: headers).timeout(const Duration(seconds: 10));
+      if (res.statusCode >= 200 && res.statusCode < 300) {
+        _logApiResponse("GET BRANDS BY CATEGORY", res.statusCode, res.body, success: true);
+        return _handleResponse(res);
+      }
+    } catch (e) {
+      debugPrint("srivagroups getBrandsByCategory failed, trying billing: $e");
+    }
+
+    try {
+      _logApiRequest("GET BRANDS BY CATEGORY (billing fallback)", "GET", billingUrl);
+      final res = await http.get(Uri.parse(billingUrl), headers: headers).timeout(const Duration(seconds: 10));
+      final success = res.statusCode >= 200 && res.statusCode < 300;
+      _logApiResponse("GET BRANDS BY CATEGORY (billing fallback)", res.statusCode, res.body, success: success);
+      return _handleResponse(res);
+    } catch (e, stackTrace) {
+      _logApiError("Get Brands By Category API", "GET", billingUrl, e, stackTrace);
+      return {};
+    }
+  }
+
+  /// ✅ GET PRODUCTS BY BRAND AND CATEGORY
+  /// Request: GET https://srivagroups.in/api/products?brand_id={brandId}&category_id={categoryId}&userId=...
+  static Future<Map<String, dynamic>> getProductsByBrandAndCategory({
+    required dynamic brandId,
+    dynamic categoryId,
+    String? userId,
+    String? businessId,
+    String? platformId,
+    String? storeId,
+  }) async {
+    final prefs = await SharedPreferences.getInstance();
+    final effectiveUserId = userId ?? prefs.getString("userId") ?? prefs.getString("user_id") ?? "4995251182";
+    final effectiveBusinessId = businessId ?? prefs.getString("selected_business_id") ?? prefs.getString("businessId") ?? "52";
+    final effectivePlatformId = platformId ?? prefs.getString("selected_platform_id") ?? prefs.getString("platformId") ?? "1";
+    final effectiveStoreId = storeId ?? prefs.getString("selected_store_id") ?? prefs.getString("storeId") ?? "38";
+
+    final catParam = categoryId != null ? "&category_id=$categoryId" : "";
+    final query = "brand_id=$brandId$catParam&userId=$effectiveUserId&businessId=$effectiveBusinessId&platformId=$effectivePlatformId&storeId=$effectiveStoreId";
+    final srivaUrl = "https://srivagroups.in/api/products?$query";
+    final billingUrl = "$baseUrl/products?$query";
+
+    final headers = await _getHeaders(auth: true);
+    headers["X-App-ID"] = "Product94674";
+
+    try {
+      _logApiRequest("GET PRODUCTS BY BRAND & CATEGORY", "GET", srivaUrl);
+      final res = await http.get(Uri.parse(srivaUrl), headers: headers).timeout(const Duration(seconds: 10));
+      if (res.statusCode >= 200 && res.statusCode < 300) {
+        _logApiResponse("GET PRODUCTS BY BRAND & CATEGORY", res.statusCode, res.body, success: true);
+        return _handleResponse(res);
+      }
+    } catch (e) {
+      debugPrint("srivagroups getProductsByBrandAndCategory failed, trying billing: $e");
+    }
+
+    try {
+      _logApiRequest("GET PRODUCTS BY BRAND & CATEGORY (billing fallback)", "GET", billingUrl);
+      final res = await http.get(Uri.parse(billingUrl), headers: headers).timeout(const Duration(seconds: 10));
+      final success = res.statusCode >= 200 && res.statusCode < 300;
+      _logApiResponse("GET PRODUCTS BY BRAND & CATEGORY (billing fallback)", res.statusCode, res.body, success: success);
+      return _handleResponse(res);
+    } catch (e, stackTrace) {
+      _logApiError("Get Products By Brand API", "GET", billingUrl, e, stackTrace);
+      return {};
+    }
+  }
+
+  /// ✅ GET BRAND LIST
+  /// Request: GET https://billing.srivagroups.in/api/brand/list
+  static Future<Map<String, dynamic>> getBrandList() async {
+    const url = "/brand/list";
+    try {
+      _logApiRequest("GET BRAND LIST", "GET", url);
+      final res = await http.get(
+        Uri.parse("$baseUrl$url"),
+        headers: await _getHeaders(auth: true),
+      );
+      final success = res.statusCode >= 200 && res.statusCode < 300;
+      _logApiResponse("GET BRAND LIST", res.statusCode, res.body, success: success);
+      return _handleResponse(res);
+    } catch (e, stackTrace) {
+      _logApiError("Get Brand List API", "GET", url, e, stackTrace);
+      return {};
+    }
+  }
 }
+

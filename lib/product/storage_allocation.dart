@@ -23,183 +23,451 @@ class _StorageAllocationPageState extends State<StorageAllocationPage> {
 
   // Storage Type data (Photo 1)
   Map<String, dynamic> activeStorage = {
-    "id": 1,
-    "name": "CircuitPoint Store",
+    "id": 20,
+    "name": "CircuitPoint Stores",
     "desc": "Manage storage, levels and items",
   };
+  List<Map<String, dynamic>> allStorageTypes = [];
 
-  // Allocated stock items for "With Variant" (Photo 1)
-  List<Map<String, dynamic>> withVariantAllocations = [
-    {
-      "id": 1,
-      "sNo": 1,
-      "locationPath": "CircuitPoint Store > CP Building > Floor 1 > Electronics Rack 1 > Shelf 5 > Diode1 > 6A4 Diode",
-      "product": "Product #2827",
-      "stockName": "6A4 DIODE 6 AMP",
-      "variant": "Imported (5)",
-      "typeDist": "Shop In Sales",
-      "allocatedQty": 8,
-      "code": "QR/Barcode",
-      "hierarchy": {
-        "Building": "CP Building",
-        "Floor": "Floor 1",
-        "Rack": "Electronics Rack 1",
-        "Shelf": "Shelf 5",
-        "Box": "Diode1",
-        "Container": "6A4 Diode",
-      },
-    },
-    {
-      "id": 2,
-      "sNo": 2,
-      "locationPath": "CircuitPoint Store > CP Building > Floor 1 > Electronics Rack 1 > Shelf 6 > GSM > GPS > SIM 900A",
-      "product": "Product #3845",
-      "stockName": "SIM 900A GSM MODULE",
-      "variant": "Standard (2)",
-      "typeDist": "Shop In Sales",
-      "allocatedQty": 2,
-      "code": "QR/Barcode",
-      "hierarchy": {
-        "Building": "CP Building",
-        "Floor": "Floor 1",
-        "Rack": "Electronics Rack 1",
-        "Shelf": "Shelf 6",
-        "Box": "GSM",
-        "Container": "GPS",
-      },
-    },
-    {
-      "id": 3,
-      "sNo": 3,
-      "locationPath": "CircuitPoint Store > CP Building > Floor 1 > Electronics Rack 1 > Shelf 4 > PCB Stepper Motor Driver > A4988 stepper motor driver module",
-      "product": "Product #731",
-      "stockName": "A4988 STEPPER MOTOR DRIVER",
-      "variant": "Red Board (4)",
-      "typeDist": "Shop In Sales",
-      "allocatedQty": 4,
-      "code": "QR/Barcode",
-      "hierarchy": {
-        "Building": "CP Building",
-        "Floor": "Floor 1",
-        "Rack": "Electronics Rack 1",
-        "Shelf": "Shelf 4",
-        "Box": "PCB Stepper Motor Driver",
-        "Container": "A4988",
-      },
-    },
-    {
-      "id": 4,
-      "sNo": 4,
-      "locationPath": "CircuitPoint Store > CP Building > Floor 1 > Electronics Rack 1 > Shelf 4 > PCB Stepper Motor Driver > ULN2003 Stepper Motor Driver",
-      "product": "Product #3897",
-      "stockName": "ULN2003 STEPPER DRIVER",
-      "variant": "Standard (8)",
-      "typeDist": "Shop In Sales",
-      "allocatedQty": 8,
-      "code": "QR/Barcode",
-      "hierarchy": {
-        "Building": "CP Building",
-        "Floor": "Floor 1",
-        "Rack": "Electronics Rack 1",
-        "Shelf": "Shelf 4",
-        "Box": "PCB Stepper Motor Driver",
-        "Container": "ULN2003",
-      },
-    },
-    {
-      "id": 5,
-      "sNo": 5,
-      "locationPath": "CircuitPoint Store > CP Building > Floor 1 > Electronics Rack 1 > Shelf 5 > Big Buzzer",
-      "product": "Product #2135",
-      "stockName": "BIG BUZZER 12V",
-      "variant": "12V Active (17)",
-      "typeDist": "Shop In Sales",
-      "allocatedQty": 17,
-      "code": "QR/Barcode",
-      "hierarchy": {
-        "Building": "CP Building",
-        "Floor": "Floor 1",
-        "Rack": "Electronics Rack 1",
-        "Shelf": "Shelf 5",
-        "Box": "Big Buzzer",
-        "Container": "Buzzer Unit",
-      },
-    },
-    {
-      "id": 6,
-      "sNo": 6,
-      "locationPath": "CircuitPoint Store > CP Building > Floor 1 > Electronics Rack 1 > Shelf 5 > Light Layer > Laser Diode",
-      "product": "Product #2127",
-      "stockName": "RED LASER DIODE 5MW",
-      "variant": "5V Dot (7)",
-      "typeDist": "Shop In Sales",
-      "allocatedQty": 7,
-      "code": "QR/Barcode",
-      "hierarchy": {
-        "Building": "CP Building",
-        "Floor": "Floor 1",
-        "Rack": "Electronics Rack 1",
-        "Shelf": "Shelf 5",
-        "Box": "Light Layer",
-        "Container": "Laser Diode",
-      },
-    },
-    {
-      "id": 7,
-      "sNo": 7,
-      "locationPath": "CircuitPoint Store > CP Building > Floor 1 > Electronics Rack 1 > Shelf 4 > PCB Stepper Motor Driver > DRV8825 Stepper Motor",
-      "product": "Product #161",
-      "stockName": "DRV8825 STEPPER DRIVER",
-      "variant": "Purple (1)",
-      "typeDist": "Shop In Sales",
-      "allocatedQty": 1,
-      "code": "QR/Barcode",
-      "hierarchy": {
-        "Building": "CP Building",
-        "Floor": "Floor 1",
-        "Rack": "Electronics Rack 1",
-        "Shelf": "Shelf 4",
-        "Box": "PCB Stepper Motor Driver",
-        "Container": "DRV8825",
-      },
-    },
-  ];
-
-  // Allocated stock items for "Without Variant" (Photo 3 is empty by default)
+  // Allocated stock items for "With Variant" and "Without Variant"
+  List<Map<String, dynamic>> withVariantAllocations = [];
   List<Map<String, dynamic>> withoutVariantAllocations = [];
+
+  // Live API Caches
+  List<dynamic> _categoriesList = [];
+  List<dynamic> _stocksList = [];
+  List<dynamic> _variantsList = [];
+  final Map<int, List<dynamic>> _storageLocationsMap = {};
 
   bool isLoading = false;
 
   @override
   void initState() {
     super.initState();
-    _fetchLiveAllocations();
+    _fetchStorageAllocationData();
   }
 
-  Future<void> _fetchLiveAllocations() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final token = prefs.getString("auth_token") ?? prefs.getString("token") ?? "";
-      final headers = {
-        "Accept": "application/json",
-        "Content-Type": "application/json",
-        if (token.isNotEmpty) "Authorization": "Bearer $token",
-      };
+  Future<Map<String, String>> _getStorageApiHeaders() async {
+    final prefs = await SharedPreferences.getInstance();
+    String token = prefs.getString("billing_auth_token") ??
+        prefs.getString("auth_token") ??
+        prefs.getString("token") ??
+        prefs.getString("access_token") ??
+        "";
+    if (token.startsWith("Bearer ")) {
+      token = token.substring(7).trim();
+    }
+    final businessId = prefs.getString('selected_business_id') ??
+        prefs.get('business_id')?.toString() ??
+        '52';
+    final storeId = prefs.getString('selected_store_id') ??
+        prefs.get('store_id')?.toString() ??
+        '38';
+    final platformId = prefs.getString('platform_id') ?? '1';
 
-      final res = await http.get(
-        Uri.parse("https://billing.srivagroups.in/api/stocks/all/locations"),
-        headers: headers,
-      ).timeout(const Duration(seconds: 4));
+    return {
+      "Accept": "application/json",
+      "Content-Type": "application/json",
+      "X-App-ID": "Product94674",
+      "x-business-id": businessId,
+      "x-store-id": storeId,
+      "x-platform-id": platformId,
+      if (token.isNotEmpty) "Authorization": "Bearer $token",
+    };
+  }
 
-      if (res.statusCode == 200) {
-        final decoded = jsonDecode(res.body);
-        final data = decoded['data'] ?? decoded;
-        if (data is List && data.isNotEmpty) {
-          // Merge with live data if available
+  List<Map<String, dynamic>> _flattenLocations(List<dynamic> treeList) {
+    final List<Map<String, dynamic>> flat = [];
+
+    void traverse(dynamic node, int? parentId) {
+      if (node is! Map) return;
+      final mapNode = Map<String, dynamic>.from(node);
+      final int? id = int.tryParse(mapNode['id']?.toString() ?? '') ??
+          int.tryParse(mapNode['location_id']?.toString() ?? '');
+      if (id == null) return;
+
+      final resolvedParentId =
+          int.tryParse(mapNode['parent_id']?.toString() ?? '') ?? parentId;
+
+      flat.add({
+        'id': id,
+        'name': (mapNode['name'] ?? mapNode['location_name'] ?? '').toString(),
+        'parent_id': resolvedParentId,
+      });
+
+      final children = mapNode['children'] ?? mapNode['child'];
+      if (children is List) {
+        for (var child in children) {
+          traverse(child, id);
         }
       }
-    } catch (_) {
-      // Offline fallback already loaded gracefully!
+    }
+
+    for (var root in treeList) {
+      traverse(root, null);
+    }
+
+    return flat;
+  }
+
+  String _buildLocationPath({
+    required int storageTypeId,
+    required int? leafLocationId,
+    required String storageTypeName,
+    required Map<int, List<dynamic>> storageLocationsMap,
+  }) {
+    final rawTree = storageLocationsMap[storageTypeId] ?? [];
+    if (leafLocationId == null || rawTree.isEmpty) {
+      return storageTypeName;
+    }
+
+    final locations = _flattenLocations(rawTree);
+    if (locations.isEmpty) {
+      return storageTypeName;
+    }
+
+    final pathParts = <String>[];
+    int? currentId = leafLocationId;
+    final visited = <int>{};
+
+    while (currentId != null && !visited.contains(currentId)) {
+      visited.add(currentId);
+      final match = locations.firstWhere(
+        (loc) => loc['id'] == currentId,
+        orElse: () => {},
+      );
+
+      if (match.isNotEmpty) {
+        final name = match['name'].toString();
+        if (name.isNotEmpty) {
+          pathParts.insert(0, name);
+        }
+        currentId = match['parent_id'] as int?;
+      } else {
+        break;
+      }
+    }
+
+    if (storageTypeName.isNotEmpty) {
+      pathParts.insert(0, storageTypeName);
+    }
+
+    return pathParts.join(' > ');
+  }
+
+  Future<void> _fetchStorageAllocationData() async {
+    if (!mounted) return;
+    setState(() {
+      isLoading = true;
+    });
+
+    try {
+      final headers = await _getStorageApiHeaders();
+      debugPrint("🚀 [Storage Allocation] Fetching all 6 live APIs...");
+
+      // API 1: Category List (GET https://srivagroups.in/api/category/list)
+      final catFuture = http.get(
+        Uri.parse("https://srivagroups.in/api/category/list"),
+        headers: {"Accept": "application/json"},
+      ).timeout(const Duration(seconds: 15));
+
+      // API 2: Storage Types (GET https://billing.srivagroups.in/api/storage/types)
+      final typesFuture = http.get(
+        Uri.parse("https://billing.srivagroups.in/api/storage/types"),
+        headers: headers,
+      ).timeout(const Duration(seconds: 15));
+
+      // API 3: Stocks (GET https://billing.srivagroups.in/api/stocks)
+      final stocksFuture = http.get(
+        Uri.parse("https://billing.srivagroups.in/api/stocks"),
+        headers: headers,
+      ).timeout(const Duration(seconds: 15));
+
+      // API 4: Variant Master (GET https://billing.srivagroups.in/api/variant-master)
+      final variantsFuture = http.get(
+        Uri.parse("https://billing.srivagroups.in/api/variant-master"),
+        headers: headers,
+      ).timeout(const Duration(seconds: 15));
+
+      // API 5: Stocks All Locations (GET https://billing.srivagroups.in/api/stocks/all/locations)
+      final allocatedFuture = http.get(
+        Uri.parse("https://billing.srivagroups.in/api/stocks/all/locations"),
+        headers: headers,
+      ).timeout(const Duration(seconds: 15));
+
+      final responses = await Future.wait([
+        catFuture.catchError((e) {
+          debugPrint("❌ Category list error: $e");
+          return http.Response('{"data":[]}', 500);
+        }),
+        typesFuture.catchError((e) {
+          debugPrint("❌ Storage types error: $e");
+          return http.Response('{"data":[]}', 500);
+        }),
+        stocksFuture.catchError((e) {
+          debugPrint("❌ Stocks error: $e");
+          return http.Response('{"data":[]}', 500);
+        }),
+        variantsFuture.catchError((e) {
+          debugPrint("❌ Variant master error: $e");
+          return http.Response('{"data":[]}', 500);
+        }),
+        allocatedFuture.catchError((e) {
+          debugPrint("❌ Stocks all locations error: $e");
+          return http.Response('{"data":[]}', 500);
+        }),
+      ]);
+
+      final catRes = responses[0];
+      final typesRes = responses[1];
+      final stocksRes = responses[2];
+      final variantsRes = responses[3];
+      final allocatedRes = responses[4];
+
+      // 1. Process Categories
+      if (catRes.statusCode >= 200 && catRes.statusCode < 300) {
+        final decoded = jsonDecode(catRes.body);
+        final data = decoded['data'] ?? decoded;
+        if (data is List) {
+          _categoriesList = data;
+        }
+      }
+
+      // 2. Process Storage Types
+      List rawStorageTypes = [];
+      if (typesRes.statusCode >= 200 && typesRes.statusCode < 300) {
+        final decoded = jsonDecode(typesRes.body);
+        final data = decoded['data'] ?? decoded;
+        if (data is List) {
+          rawStorageTypes = data;
+        } else if (data is Map && data['data'] is List) {
+          rawStorageTypes = data['data'];
+        }
+        if (rawStorageTypes.isNotEmpty) {
+          allStorageTypes = List<Map<String, dynamic>>.from(
+            rawStorageTypes.whereType<Map>().map((e) => Map<String, dynamic>.from(e)),
+          );
+          final first = rawStorageTypes[0];
+          activeStorage = {
+            "id": first['id'] ?? activeStorage['id'] ?? 1,
+            "name": first['name'] ?? first['storage_name'] ?? "CircuitPoint Stores",
+            "desc": first['description'] ?? first['desc'] ?? "Manage storage, levels and items",
+          };
+        }
+      }
+
+      // 3. Process Stocks
+      if (stocksRes.statusCode >= 200 && stocksRes.statusCode < 300) {
+        final decoded = jsonDecode(stocksRes.body);
+        final data = decoded['data'] ?? decoded;
+        if (data is List) {
+          _stocksList = data;
+        } else if (data is Map && data['data'] is List) {
+          _stocksList = data['data'];
+        }
+      }
+
+      // 4. Process Variants
+      if (variantsRes.statusCode >= 200 && variantsRes.statusCode < 300) {
+        final decoded = jsonDecode(variantsRes.body);
+        final data = decoded['data'] ?? decoded;
+        if (data is List) {
+          _variantsList = data;
+        } else if (data is Map && data['data'] is List) {
+          _variantsList = data['data'];
+        }
+      }
+
+      // API 6: Storage Locations Hierarchy (GET https://billing.srivagroups.in/api/storage/locations/{activeStorage['id']})
+      final activeTypeId = activeStorage['id'] ?? 1;
+      try {
+        final locRes = await http.get(
+          Uri.parse("https://billing.srivagroups.in/api/storage/locations/$activeTypeId"),
+          headers: headers,
+        ).timeout(const Duration(seconds: 10));
+
+        if (locRes.statusCode >= 200 && locRes.statusCode < 300) {
+          final decoded = jsonDecode(locRes.body);
+          final data = decoded['data'] ?? decoded['locations'] ?? decoded['hierarchy'] ?? decoded;
+          if (data is List) {
+            _storageLocationsMap[activeTypeId as int] = data;
+          } else if (data is Map && data['data'] is List) {
+            _storageLocationsMap[activeTypeId as int] = data['data'];
+          }
+        }
+      } catch (e) {
+        debugPrint("❌ Storage locations fetch error: $e");
+      }
+
+      // 5. Process Stocks All Locations
+      if (allocatedRes.statusCode >= 200 && allocatedRes.statusCode < 300) {
+        final decoded = jsonDecode(allocatedRes.body);
+        final data = decoded['data'] ?? decoded;
+
+        List rawAllocations = [];
+        if (data is List) {
+          rawAllocations = data;
+        } else if (data is Map && data['data'] is List) {
+          rawAllocations = data['data'];
+        }
+
+        final List<Map<String, dynamic>> newWithVariant = [];
+        final List<Map<String, dynamic>> newWithoutVariant = [];
+
+        for (var item in rawAllocations) {
+          if (item is! Map) continue;
+          final mapLoc = Map<String, dynamic>.from(item);
+
+          final int id = int.tryParse(mapLoc['id']?.toString() ?? '') ?? 0;
+          final stockId = int.tryParse(mapLoc['stock_id']?.toString() ?? '') ??
+              int.tryParse(mapLoc['product_id']?.toString() ?? '') ??
+              0;
+          final variantId = int.tryParse(mapLoc['variant_id']?.toString() ?? '') ??
+              int.tryParse(mapLoc['product_variant_id']?.toString() ?? '');
+          final String variantRaw =
+              (mapLoc['variant'] ?? mapLoc['variant_name'] ?? '').toString();
+
+          // Resolve Product Details
+          String productName = (mapLoc['product'] ??
+                  mapLoc['product_name'] ??
+                  mapLoc['stockName'] ??
+                  '')
+              .toString();
+          String productCode =
+              (mapLoc['code'] ?? mapLoc['barcode'] ?? mapLoc['sku'] ?? 'QR/Barcode')
+                  .toString();
+
+          String categoryName = '';
+          if (stockId > 0 && _stocksList.isNotEmpty) {
+            final matchedStock = _stocksList.firstWhere(
+              (s) => s['id'] == stockId || s['product_id'] == stockId,
+              orElse: () => {},
+            );
+            if (matchedStock.isNotEmpty) {
+              final name = matchedStock['product_name'] ??
+                  matchedStock['name'] ??
+                  matchedStock['product']?['name'];
+              if (name != null && name.toString().isNotEmpty) {
+                productName = name.toString();
+              }
+              final code = matchedStock['sku'] ??
+                  matchedStock['product_code'] ??
+                  matchedStock['code'];
+              if (code != null && code.toString().isNotEmpty) {
+                productCode = code.toString();
+              }
+              final catId = matchedStock['category_id'] ??
+                  matchedStock['category'] ??
+                  matchedStock['category_name_id'];
+              if (catId != null && _categoriesList.isNotEmpty) {
+                final matchedCat = _categoriesList.firstWhere(
+                  (c) => c['id'].toString() == catId.toString(),
+                  orElse: () => {},
+                );
+                if (matchedCat.isNotEmpty) {
+                  categoryName = (matchedCat['name'] ??
+                          matchedCat['category_name'] ??
+                          '')
+                      .toString();
+                }
+              }
+            }
+          }
+          if (productName.isEmpty) {
+            productName = stockId > 0 ? "Product #$stockId" : "Stock Item";
+          }
+
+          // Resolve Variant Name
+          String variantName = variantRaw;
+          if ((variantId != null && variantId > 0) && _variantsList.isNotEmpty) {
+            final matchedV = _variantsList.firstWhere(
+              (v) => v['id'] == variantId,
+              orElse: () => {},
+            );
+            if (matchedV.isNotEmpty) {
+              variantName =
+                  (matchedV['name'] ?? matchedV['variant_name'] ?? '').toString();
+            }
+          }
+
+          // Format Location Path
+          String locationPath =
+              (mapLoc['location_path'] ?? mapLoc['path'] ?? '').toString();
+          if (locationPath.isEmpty) {
+            final stId = int.tryParse(mapLoc['storage_type_id']?.toString() ?? '') ??
+                activeStorage['id'] ??
+                1;
+            final leafId =
+                int.tryParse(mapLoc['storage_location_id']?.toString() ?? '') ??
+                    int.tryParse(mapLoc['location_id']?.toString() ?? '');
+            locationPath = _buildLocationPath(
+              storageTypeId: stId,
+              leafLocationId: leafId,
+              storageTypeName:
+                  activeStorage['name'] ?? "CircuitPoint Stores",
+              storageLocationsMap: _storageLocationsMap,
+            );
+          }
+
+          final String typeDist =
+              (mapLoc['type'] ?? mapLoc['dist_type'] ?? mapLoc['type_dist'] ?? 'Shop In Sales')
+                  .toString();
+          final int qty = int.tryParse(mapLoc['qty']?.toString() ?? '') ??
+              int.tryParse(mapLoc['allocated_qty']?.toString() ?? '') ??
+              0;
+
+          final record = {
+            "id": id,
+            "sNo": 0,
+            "locationPath": locationPath,
+            "product": productName,
+            "stockName": productName,
+            "variant": variantName,
+            "category": categoryName,
+            "typeDist": typeDist,
+            "allocatedQty": qty,
+            "code": productCode,
+            "hierarchy": mapLoc['hierarchy'] ?? {},
+            "raw": mapLoc,
+          };
+
+          final bool hasVariant =
+              (variantId != null && variantId > 0) || variantName.isNotEmpty;
+          if (hasVariant) {
+            newWithVariant.add(record);
+          } else {
+            newWithoutVariant.add(record);
+          }
+        }
+
+        for (int i = 0; i < newWithVariant.length; i++) {
+          newWithVariant[i]['sNo'] = i + 1;
+        }
+        for (int i = 0; i < newWithoutVariant.length; i++) {
+          newWithoutVariant[i]['sNo'] = i + 1;
+        }
+
+        if (mounted) {
+          setState(() {
+            withVariantAllocations = newWithVariant;
+            withoutVariantAllocations = newWithoutVariant;
+            isLoading = false;
+          });
+        }
+      } else {
+        if (mounted) {
+          setState(() {
+            isLoading = false;
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint("❌ Error fetching storage allocation data: $e");
+      if (mounted) {
+        setState(() {
+          isLoading = false;
+        });
+      }
     }
   }
 
@@ -250,16 +518,55 @@ class _StorageAllocationPageState extends State<StorageAllocationPage> {
             child: const Text("Cancel"),
           ),
           ElevatedButton(
-            onPressed: () {
+            onPressed: () async {
               final newName = nameCtrl.text.trim();
               if (newName.isNotEmpty) {
-                setState(() {
-                  activeStorage['name'] = newName;
-                });
                 Navigator.pop(ctx);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text("Storage updated successfully"), backgroundColor: Colors.green),
-                );
+                final stId = activeStorage['id'] ?? 20;
+                try {
+                  final headers = await _getStorageApiHeaders();
+                  final res = await http.put(
+                    Uri.parse("https://billing.srivagroups.in/api/storage/type/$stId"),
+                    headers: headers,
+                    body: jsonEncode({
+                      "name": newName,
+                    }),
+                  ).timeout(const Duration(seconds: 15));
+
+                  String msg = "Storage type updated";
+                  if (res.statusCode >= 200 && res.statusCode < 300) {
+                    try {
+                      final decoded = jsonDecode(res.body);
+                      if (decoded['message'] != null) {
+                        msg = decoded['message'].toString();
+                      }
+                    } catch (_) {}
+                  }
+
+                  setState(() {
+                    activeStorage['name'] = newName;
+                    for (var st in allStorageTypes) {
+                      if (st['id'] == stId) {
+                        st['name'] = newName;
+                      }
+                    }
+                  });
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text(msg), backgroundColor: Colors.green),
+                    );
+                  }
+                } catch (e) {
+                  debugPrint("❌ Storage update error: $e");
+                  setState(() {
+                    activeStorage['name'] = newName;
+                  });
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text("Storage updated successfully"), backgroundColor: Colors.green),
+                    );
+                  }
+                }
               }
             },
             style: ElevatedButton.styleFrom(
@@ -302,25 +609,37 @@ class _StorageAllocationPageState extends State<StorageAllocationPage> {
             child: const Text("Cancel"),
           ),
           ElevatedButton(
-            onPressed: () {
-              setState(() {
-                if (isWithVariant) {
-                  withVariantAllocations.removeWhere((item) => item['id'] == id);
-                  // Re-index sNo
-                  for (int i = 0; i < withVariantAllocations.length; i++) {
-                    withVariantAllocations[i]['sNo'] = i + 1;
-                  }
-                } else {
-                  withoutVariantAllocations.removeWhere((item) => item['id'] == id);
-                  for (int i = 0; i < withoutVariantAllocations.length; i++) {
-                    withoutVariantAllocations[i]['sNo'] = i + 1;
-                  }
-                }
-              });
+            onPressed: () async {
               Navigator.pop(ctx);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text("Allocation deleted successfully"), backgroundColor: Colors.green),
-              );
+              try {
+                final headers = await _getStorageApiHeaders();
+                await http.delete(
+                  Uri.parse("https://billing.srivagroups.in/api/stocks/all/locations/$id"),
+                  headers: headers,
+                ).timeout(const Duration(seconds: 15));
+
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text("Allocation deleted successfully"), backgroundColor: Colors.green),
+                  );
+                }
+                _fetchStorageAllocationData();
+              } catch (e) {
+                debugPrint("Delete error: $e");
+                setState(() {
+                  if (isWithVariant) {
+                    withVariantAllocations.removeWhere((item) => item['id'] == id);
+                    for (int i = 0; i < withVariantAllocations.length; i++) {
+                      withVariantAllocations[i]['sNo'] = i + 1;
+                    }
+                  } else {
+                    withoutVariantAllocations.removeWhere((item) => item['id'] == id);
+                    for (int i = 0; i < withoutVariantAllocations.length; i++) {
+                      withoutVariantAllocations[i]['sNo'] = i + 1;
+                    }
+                  }
+                });
+              }
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFFEF4444),
@@ -399,23 +718,8 @@ class _StorageAllocationPageState extends State<StorageAllocationPage> {
       ),
     );
 
-    if (result != null && result is Map<String, dynamic>) {
-      setState(() {
-        if (isWithVariant) {
-          final idx = withVariantAllocations.indexWhere((e) => e['id'] == result['id']);
-          if (idx != -1) {
-            withVariantAllocations[idx] = result;
-          } else {
-            result['sNo'] = withVariantAllocations.length + 1;
-            withVariantAllocations.add(result);
-          }
-        }
-      });
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Allocation updated successfully"), backgroundColor: Colors.green),
-        );
-      }
+    if (result != null) {
+      _fetchStorageAllocationData();
     }
   }
 
@@ -430,17 +734,8 @@ class _StorageAllocationPageState extends State<StorageAllocationPage> {
       ),
     );
 
-    if (result != null && result is Map<String, dynamic>) {
-      setState(() {
-        result['id'] = DateTime.now().millisecondsSinceEpoch;
-        result['sNo'] = withVariantAllocations.length + 1;
-        withVariantAllocations.add(result);
-      });
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Allocation created successfully"), backgroundColor: Colors.green),
-        );
-      }
+    if (result != null) {
+      _fetchStorageAllocationData();
     }
   }
 
@@ -453,7 +748,8 @@ class _StorageAllocationPageState extends State<StorageAllocationPage> {
       final path = (item['locationPath'] ?? '').toString().toLowerCase();
       final prod = (item['product'] ?? '').toString().toLowerCase();
       final stock = (item['stockName'] ?? '').toString().toLowerCase();
-      return path.contains(q) || prod.contains(q) || stock.contains(q);
+      final cat = (item['category'] ?? '').toString().toLowerCase();
+      return path.contains(q) || prod.contains(q) || stock.contains(q) || cat.contains(q);
     }).toList();
 
     return Scaffold(
@@ -475,11 +771,20 @@ class _StorageAllocationPageState extends State<StorageAllocationPage> {
           child: Container(height: 1, color: Colors.grey.shade200),
         ),
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+      body: Column(
+        children: [
+          if (isLoading)
+            const LinearProgressIndicator(
+              minHeight: 3,
+              backgroundColor: Color(0xFFEFF6FF),
+              valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF2563EB)),
+            ),
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
             // TOP HEADER: Storage Allocation with 2D View & 3D View (Photo 1)
             Wrap(
               alignment: WrapAlignment.spaceBetween,
@@ -637,8 +942,10 @@ class _StorageAllocationPageState extends State<StorageAllocationPage> {
                     spacing: 12,
                     runSpacing: 10,
                     children: [
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
+                      Wrap(
+                        spacing: 12,
+                        runSpacing: 8,
+                        crossAxisAlignment: WrapCrossAlignment.center,
                         children: [
                           Text(
                             "Allocated Stock Review",
@@ -648,7 +955,6 @@ class _StorageAllocationPageState extends State<StorageAllocationPage> {
                               color: const Color(0xFF0F172A),
                             ),
                           ),
-                          const SizedBox(width: 14),
                           // TOGGLES: With Variant / Without Variant (Photos 1 & 3)
                           Container(
                             decoration: BoxDecoration(
@@ -711,15 +1017,16 @@ class _StorageAllocationPageState extends State<StorageAllocationPage> {
                         ],
                       ),
                       OutlinedButton.icon(
-                        onPressed: () {
-                          _fetchLiveAllocations();
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text("Data refreshed")),
-                          );
-                        },
-                        icon: const Icon(Icons.refresh_rounded, size: 14, color: Color(0xFF2563EB)),
+                        onPressed: isLoading ? null : _fetchStorageAllocationData,
+                        icon: isLoading
+                            ? const SizedBox(
+                                width: 14,
+                                height: 14,
+                                child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF2563EB)),
+                              )
+                            : const Icon(Icons.refresh_rounded, size: 14, color: Color(0xFF2563EB)),
                         label: Text(
-                          "Refresh Data",
+                          isLoading ? "Loading..." : "Refresh Data",
                           style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.bold, color: const Color(0xFF2563EB)),
                         ),
                         style: OutlinedButton.styleFrom(
@@ -929,6 +1236,9 @@ class _StorageAllocationPageState extends State<StorageAllocationPage> {
           ],
         ),
       ),
-    );
+    ),
+  ],
+),
+);
   }
 }

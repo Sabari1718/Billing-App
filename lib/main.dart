@@ -4,7 +4,6 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'Auth/login.dart';
 import 'Auth/select.dart';
-import 'Auth/billing dashboardc.dart';
 import 'Auth/role_selection.dart';
 import 'mainscreen/screens/login_screen.dart';
 import 'package:billingapp/utils/app_logger.dart';
@@ -268,13 +267,10 @@ class _AuthWrapperState extends State<AuthWrapper> {
   @override
   Widget build(BuildContext context) {
     if (_startScreen == null) {
-      return Scaffold(
+      return const Scaffold(
         backgroundColor: Colors.white,
         body: Center(
-          child: Image.asset(
-            'assets/images.png',
-            fit: BoxFit.contain,
-          ),
+          child: CircularProgressIndicator(color: Color(0xFF2563EB), strokeWidth: 2.5),
         ),
       );
     }

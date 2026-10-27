@@ -4,6 +4,9 @@ import 'package:billingapp/models/category%20grou0p.dart';
 import 'package:billingapp/utils/app_logger.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:billingapp/Auth/billing%20dashboardc.dart';
+import 'package:billingapp/product/viewpage.dart';
 
 part 'add_product_logic.dart';
 part 'add_product_widgets.dart';
@@ -32,6 +35,8 @@ class _ProductEntryPageState extends State<ProductEntryPage> {
   int? selectedBrandId;
   int? selectedProductId;
   String? selectedProductName;
+  String? selectedProductMrp;
+  String? selectedProductCode;
 
   final minQtyController = TextEditingController();
   final maxQtyController = TextEditingController();
@@ -39,6 +44,54 @@ class _ProductEntryPageState extends State<ProductEntryPage> {
 
   String? _autofilledText;
   bool isLoading = true;
+
+  void clearCategory() {
+    setState(() {
+      selectedCategoryId = null;
+      selectedSecondaryCategoryId = null;
+      selectedBrandId = null;
+      selectedProductId = null;
+      selectedProductName = null;
+      selectedProductMrp = null;
+      selectedProductCode = null;
+      secondaryCategories = [];
+      brands = [];
+      products = [];
+    });
+  }
+
+  void incrementMinQty() {
+    final cur = int.tryParse(minQtyController.text) ?? 0;
+    minQtyController.text = (cur + 1).toString();
+    setState(() {});
+  }
+
+  void decrementMinQty() {
+    final cur = int.tryParse(minQtyController.text) ?? 0;
+    if (cur > 1) {
+      minQtyController.text = (cur - 1).toString();
+    } else {
+      minQtyController.text = "";
+    }
+    setState(() {});
+  }
+
+  void incrementMaxQty() {
+    final cur = int.tryParse(maxQtyController.text) ?? 0;
+    maxQtyController.text = (cur + 1).toString();
+    setState(() {});
+  }
+
+  void decrementMaxQty() {
+    final cur = int.tryParse(maxQtyController.text) ?? 0;
+    if (cur > 1) {
+      maxQtyController.text = (cur - 1).toString();
+    } else {
+      maxQtyController.text = "";
+    }
+    setState(() {});
+  }
+
 
   // SCAN SETUP
   bool _isScanMode = false;
@@ -49,6 +102,21 @@ class _ProductEntryPageState extends State<ProductEntryPage> {
   int? editCategoryGroupId;
   int? editCategoryId;
   int? editBrandId;
+
+  // STORE SETUP HIERARCHY (From GET /api/product-entry/store-setup)
+  String hierarchyMode = "primary_secondary_brand";
+  bool hasSecondaryCategories = true;
+  List<Map<String, dynamic>> storeSetupPrimaryCategories = [];
+
+  // CONNECTED APIS: STORE, NOTIFICATIONS, PERMISSIONS
+  List<Map<String, dynamic>> stores = [];
+  Map<String, dynamic>? currentStore;
+  int unreadNotificationsCount = 0;
+  bool isOwner = true;
+  bool canCreateProduct = true;
+  bool canReadProduct = true;
+  bool canManageProduct = true;
+  Map<String, dynamic>? userPermissions;
 
   @override
   void initState() {
@@ -92,12 +160,45 @@ class _ProductEntryPageState extends State<ProductEntryPage> {
               child: const Icon(Icons.inventory_2_outlined, color: Color(0xFF2563EB), size: 20),
             ),
             const SizedBox(width: 10),
-            Text(
-              "Product Entry",
-              style: GoogleFonts.inter(
-                fontWeight: FontWeight.w700,
-                fontSize: 18,
-                color: const Color(0xFF0F172A),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    "Product Entry",
+                    style: GoogleFonts.inter(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 17,
+                      color: const Color(0xFF0F172A),
+                    ),
+                  ),
+                  if (currentStore != null)
+                    Row(
+                      children: [
+                        Container(
+                          width: 6,
+                          height: 6,
+                          decoration: const BoxDecoration(
+                            color: Color(0xFF10B981),
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        Flexible(
+                          child: Text(
+                            "${currentStore!['store_name'] ?? 'Store'} • #${currentStore!['store_id'] ?? ''}",
+                            style: GoogleFonts.inter(
+                              fontSize: 11,
+                              color: const Color(0xFF64748B),
+                              fontWeight: FontWeight.w500,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                ],
               ),
             ),
           ],
@@ -106,8 +207,42 @@ class _ProductEntryPageState extends State<ProductEntryPage> {
         backgroundColor: Colors.white,
         foregroundColor: const Color(0xFF0F172A),
         actions: [
+          // Notification Bell with Unread Badge
+          Stack(
+            alignment: Alignment.center,
+            children: [
+              IconButton(
+                icon: const Icon(Icons.notifications_none_outlined, size: 22),
+                tooltip: "Notifications",
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const NotificationsPage()),
+                  );
+                },
+              ),
+              if (unreadNotificationsCount > 0)
+                Positioned(
+                  top: 8,
+                  right: 8,
+                  child: Container(
+                    padding: const EdgeInsets.all(3),
+                    decoration: const BoxDecoration(
+                      color: Colors.redAccent,
+                      shape: BoxShape.circle,
+                    ),
+                    constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+                    child: Text(
+                      "$unreadNotificationsCount",
+                      style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                ),
+            ],
+          ),
           Padding(
-            padding: const EdgeInsets.only(right: 16.0, top: 10, bottom: 10),
+            padding: const EdgeInsets.only(right: 12.0, top: 10, bottom: 10),
             child: ElevatedButton(
               onPressed: () {
                 _showAdvanceSearchDialog();
@@ -118,7 +253,7 @@ class _ProductEntryPageState extends State<ProductEntryPage> {
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(8),
                 ),
-                padding: const EdgeInsets.symmetric(horizontal: 16),
+                padding: const EdgeInsets.symmetric(horizontal: 14),
                 elevation: 0,
               ),
               child: Text(
@@ -209,61 +344,72 @@ class _ProductEntryPageState extends State<ProductEntryPage> {
 
                       // Centered Action Buttons (Save [Blue] & Cancel [Red])
                       Center(
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            SizedBox(
-                              width: 140,
-                              height: 44,
-                              child: ElevatedButton(
-                                onPressed: saveOrUpdate,
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: const Color(0xFF60A5FA), // Soft blue like web button
-                                  foregroundColor: Colors.white,
-                                  elevation: 0,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(10),
-                                  ),
-                                ),
-                                child: Text(
-                                  isEditing ? "Update" : "Save",
-                                  style: GoogleFonts.inter(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 14,
-                                  ),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 16),
-                            SizedBox(
-                              width: 140,
-                              height: 44,
-                              child: ElevatedButton(
-                                onPressed: () {
-                                  if (widget.editItem != null) {
-                                    Navigator.pop(context);
-                                  } else {
-                                    cancelEdit();
-                                  }
-                                },
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: const Color(0xFFEF4444), // Red button like web
-                                  foregroundColor: Colors.white,
-                                  elevation: 0,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(10),
-                                  ),
-                                ),
-                                child: Text(
-                                  "Cancel",
-                                  style: GoogleFonts.inter(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 14,
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 340),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Expanded(
+                                child: SizedBox(
+                                  height: 48,
+                                  child: ElevatedButton.icon(
+                                    onPressed: saveOrUpdate,
+                                    icon: const Icon(Icons.check_circle_rounded, color: Colors.white, size: 18),
+                                    label: Text(
+                                      isEditing ? "Update" : "Save",
+                                      style: GoogleFonts.inter(
+                                        fontWeight: FontWeight.w800,
+                                        fontSize: 15,
+                                        color: Colors.white,
+                                        letterSpacing: 0.5,
+                                      ),
+                                    ),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: const Color(0xFF2563EB),
+                                      foregroundColor: Colors.white,
+                                      elevation: 2,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(10),
+                                      ),
+                                    ),
                                   ),
                                 ),
                               ),
-                            ),
-                          ],
+                              const SizedBox(width: 14),
+                              Expanded(
+                                child: SizedBox(
+                                  height: 48,
+                                  child: ElevatedButton.icon(
+                                    onPressed: () {
+                                      if (widget.editItem != null) {
+                                        Navigator.pop(context);
+                                      } else {
+                                        cancelEdit();
+                                      }
+                                    },
+                                    icon: const Icon(Icons.close_rounded, color: Colors.white, size: 18),
+                                    label: Text(
+                                      "Cancel",
+                                      style: GoogleFonts.inter(
+                                        fontWeight: FontWeight.w800,
+                                        fontSize: 15,
+                                        color: Colors.white,
+                                        letterSpacing: 0.5,
+                                      ),
+                                    ),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: const Color(0xFFDC2626),
+                                      foregroundColor: Colors.white,
+                                      elevation: 2,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(10),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     ],

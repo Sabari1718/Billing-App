@@ -9,7 +9,6 @@ import 'package:billingapp/mainscreen/services/storage_service.dart';
 import 'package:billingapp/mainscreen/theme/app_theme.dart';
 import 'package:billingapp/mainscreen/utils/constants.dart';
 import 'package:billingapp/mainscreen/screens/login_screen.dart';
-import 'package:billingapp/mainscreen/screens/dashboard_screen.dart';
 import 'package:billingapp/Auth/billing dashboardc.dart';
 import 'package:billingapp/mainscreen/services/security_manager.dart';
 import 'package:billingapp/mainscreen/services/secure_storage_service.dart';
@@ -70,7 +69,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
   }
 
   void _startRoutingTimer() {
-    Timer(const Duration(milliseconds: 3200), () async {
+    Timer(const Duration(milliseconds: 800), () async {
       if (!mounted) return;
       
       final storageService = Provider.of<StorageService>(context, listen: false);
@@ -319,39 +318,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      // Holographic Glowing Shield Icon
-                      Container(
-                        padding: EdgeInsets.all(28.r),
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: Theme.of(context).colorScheme.surface,
-                          boxShadow: [
-                            BoxShadow(
-                              color: Theme.of(context).colorScheme.primary.withOpacity(0.2),
-                              blurRadius: 30,
-                              spreadRadius: 8,
-                            ),
-                          ],
-                          border: Border.all(
-                            color: Theme.of(context).colorScheme.primary.withOpacity(0.12),
-                            width: 2,
-                          ),
-                        ),
-                        child: ShaderMask(
-                          shaderCallback: (bounds) => const LinearGradient(
-                            colors: AppTheme.primaryGradient,
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          ).createShader(bounds),
-                          child: Icon(
-                            Icons.shield_outlined,
-                            size: 84.r,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ),
-                      
-                      SizedBox(height: 32.h),
+                      // Central text branding without icon photo
                       
                       // App Name
                       Text(

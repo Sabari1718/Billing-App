@@ -564,13 +564,10 @@ class ProductMenuPage extends StatelessWidget {
         children: [
           buildItem(context, "Add Product", const ProductEntryPage(), Icons.add_box_outlined, Colors.blue),
           buildItem(context, "Product List", const ProductAllocationPage(), Icons.format_list_bulleted, Colors.indigo),
-          buildItem(context, "Variant Master", const VariantMasterPage(), Icons.dashboard_customize_outlined, Colors.purple),
           buildItem(context, "Stock Entry", StockEntryPage(), Icons.input_outlined, Colors.teal),
           buildItem(context, "Stock List", const StockListPage(), Icons.fact_check_outlined, Colors.green),
-          buildItem(context, "Stock Orders", const StockOrdersPage(), Icons.receipt_long_outlined, Colors.amber.shade800),
           buildItem(context, "Stock Status", const StockStatusPage(), Icons.analytics_outlined, Colors.cyan),
           buildItem(context, "Restock Requests", const RestockRequestsPage(), Icons.published_with_changes_outlined, Colors.deepOrange),
-          buildItem(context, "Inventory Settings", const InventorySettingsPage(), Icons.tune_outlined, Colors.brown),
           buildItem(context, "Storage", const StoragePage(), Icons.warehouse_outlined, Colors.blueGrey),
           buildItem(context, "Storage Allocation", const StorageAllocationPage(), Icons.hub_outlined, Colors.indigo),
         ],

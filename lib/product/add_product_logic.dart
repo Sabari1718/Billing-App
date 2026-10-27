@@ -3,22 +3,223 @@ part of 'add product.dart';
 extension _ProductEntryPageStateLogic on _ProductEntryPageState {
   Future<void> loadInitialData() async {
     try {
-      final list = await ApiService.getCategoryGroups();
-      if (!mounted) return;
-      setState(() => categoryGroups = list);
+      final prefs = await SharedPreferences.getInstance();
+      final bId = prefs.getString("selected_business_id") ??
+          prefs.get("business_id")?.toString() ??
+          "52";
+      final pId = prefs.getString("selected_platform_id") ??
+          prefs.get("platform_id")?.toString() ??
+          "1";
+      final uId = prefs.getString("user_main_id") ??
+          prefs.getString("user_id") ??
+          prefs.get("user_id")?.toString() ??
+          "4995251182";
+      final sId = prefs.getString("selected_store_id") ??
+          prefs.get("store_id")?.toString() ??
+          "38";
 
-      if (list.isNotEmpty) {
-        final targetGroupId = editCategoryGroupId ?? list.first.id!;
-        selectedCategoryGroupId = targetGroupId;
-        await loadCategoryBrandData(targetGroupId);
+      // 1. Primary Requirement: Fetch Category List directly from https://srivagroups.in/api/category/list
+      bool categoryLoaded = false;
+      try {
+        final catListRes = await ApiService.getCategoryList();
+        final rawCatList = catListRes['data'];
+        if (rawCatList is List && rawCatList.isNotEmpty) {
+          final List<Map<String, dynamic>> primaryList = [];
+          final List<Map<String, dynamic>> secondaryList = [];
+
+          for (var item in rawCatList) {
+            if (item != null && item is Map && item['id'] != null) {
+              final catId = int.tryParse(item['id'].toString()) ?? 0;
+              final catName = (item['name'] ?? item['category_name'] ?? "").toString().trim();
+              if (catId == 0 || catName.isEmpty) continue;
+              final catCode = (item['code'] ?? "").toString().trim();
+              final catType = (item['category_type'] ?? item['categoryType'] ?? "primary").toString().toLowerCase();
+              final imgUrl = (item['image_url'] ?? item['image'] ?? "").toString();
+              final pCatId = item['parent_category_id'] ?? item['parentCategoryId'];
+              final pCatName = (item['parent_category_name'] ?? "").toString().trim();
+
+              final catObj = {
+                "id": catId,
+                "name": catName,
+                "code": catCode,
+                "type": catType,
+                "is_primary": catType == "primary",
+                "parent_id": pCatId,
+                "parent_name": pCatName,
+                "image_url": imgUrl,
+                "brands": [],
+                "raw": item,
+              };
+
+              if (catType == "primary") {
+                primaryList.add(catObj);
+              } else {
+                secondaryList.add(catObj);
+              }
+            }
+          }
+
+          // Build hierarchical list: Primary Category, followed by its subcategories (Matching Web Photo 3)
+          final List<Map<String, dynamic>> hierarchical = [];
+          final Set<int> addedSecondaryIds = {};
+
+          for (var p in primaryList) {
+            hierarchical.add(p);
+
+            final children = secondaryList.where((s) {
+              final pid = s['parent_id']?.toString();
+              final pname = s['parent_name']?.toString().toLowerCase();
+              return pid == p['id'].toString() || (pname != null && pname.isNotEmpty && pname == p['name'].toString().toLowerCase());
+            }).toList();
+
+            for (var c in children) {
+              addedSecondaryIds.add(c['id'] as int);
+              hierarchical.add(c);
+            }
+          }
+
+          // Append any remaining unparented secondary categories
+          for (var s in secondaryList) {
+            if (!addedSecondaryIds.contains(s['id'] as int)) {
+              hierarchical.add(s);
+            }
+          }
+
+          if (hierarchical.isNotEmpty) {
+            categoryItems = hierarchical;
+            categoryLoaded = true;
+            debugPrint("Successfully loaded ${hierarchical.length} categories hierarchically from srivagroups.in");
+          }
+        }
+      } catch (e) {
+        debugPrint("Error fetching category list from srivagroups: $e");
       }
 
+      // 2. Auxiliary APIs: Stores, Notifications, Permissions, CategoryGroups, StoreSetup (Safe & Non-blocking)
+      try {
+        final storeRes = await ApiService.getStores(businessId: bId, platformId: pId);
+        if (storeRes['success'] == true && storeRes['data'] is List) {
+          stores = List<Map<String, dynamic>>.from(storeRes['data']);
+          if (stores.isNotEmpty) currentStore = stores.first;
+        }
+      } catch (_) {}
+
+      try {
+        final notifRes = await ApiService.getNotifications();
+        if (notifRes['success'] == true) {
+          final counts = notifRes['counts'];
+          if (counts is Map && counts['unread'] != null) {
+            unreadNotificationsCount = int.tryParse(counts['unread'].toString()) ?? 0;
+          } else if (notifRes['notifications'] is List) {
+            unreadNotificationsCount = (notifRes['notifications'] as List).length;
+          }
+        }
+      } catch (_) {}
+
+      try {
+        final permRes = await ApiService.getUserPermissions();
+        if (permRes['success'] == true) {
+          userPermissions = permRes;
+          isOwner = permRes['isOwner'] == true;
+          final modules = permRes['modules'];
+          if (modules is List) {
+            for (var mod in modules) {
+              if (mod['moduleName'] == 'Product' && mod['pages'] is List) {
+                for (var page in mod['pages']) {
+                  if (page['pageName'] == 'Add Product') {
+                    final perms = page['permissions'] ?? {};
+                    canCreateProduct = perms['create'] == true || isOwner;
+                    canReadProduct = perms['read'] == true || isOwner;
+                    canManageProduct = perms['manage'] == true || isOwner;
+                  }
+                }
+              }
+            }
+          }
+        }
+      } catch (_) {}
+
+      try {
+        final list = await ApiService.getCategoryGroups();
+        setState(() => categoryGroups = list);
+        if (list.isNotEmpty) {
+          selectedCategoryGroupId = editCategoryGroupId ?? list.first.id!;
+        }
+      } catch (_) {}
+
+      // 3. Fallback: If category list failed, use Store Setup or Category Groups
+      if (!categoryLoaded) {
+        try {
+          final storeSetupRes = await ApiService.getProductEntryStoreSetup(
+            userId: uId,
+            businessId: bId,
+            platformId: pId,
+            storeId: sId,
+          );
+          if (storeSetupRes['success'] == true && storeSetupRes['data'] is Map<String, dynamic>) {
+            final setupData = storeSetupRes['data'] as Map<String, dynamic>;
+            hierarchyMode = setupData['hierarchy_mode']?.toString() ?? "primary_secondary_brand";
+            hasSecondaryCategories = setupData['has_secondary_categories'] == true;
+            final rawPrimary = setupData['primaryCategories'];
+            if (rawPrimary is List && rawPrimary.isNotEmpty) {
+              final List<Map<String, dynamic>> parsedCategories = [];
+              for (var item in rawPrimary) {
+                if (item['id'] != null) {
+                  parsedCategories.add({
+                    "id": item['id'],
+                    "name": item['name'] ?? "No Name",
+                    "brands": List<Map<String, dynamic>>.from(item['brands'] ?? []),
+                  });
+                }
+              }
+              if (parsedCategories.isNotEmpty) {
+                categoryItems = parsedCategories;
+                categoryLoaded = true;
+              }
+            }
+          }
+        } catch (_) {}
+
+        if (!categoryLoaded) {
+          if (categoryGroups.isNotEmpty) {
+            final targetGroupId = editCategoryGroupId ?? categoryGroups.first.id!;
+            selectedCategoryGroupId = targetGroupId;
+            await loadCategoryBrandData(targetGroupId);
+          } else {
+            await _loadCategoriesFallback();
+          }
+        }
+      }
+
+      // Initialize selection in edit mode if needed
       if (editCategoryId != null) {
-        selectedCategoryId = editCategoryId;
-        final matchedItem = rawCategoryBrandData.firstWhere(
-          (item) => item['category_id'] == editCategoryId,
-          orElse: () => {},
-        );
+        await _initializeEditCategoryBrand();
+      }
+    } catch (e) {
+      AppLogger.error("INIT ERROR", e);
+    } finally {
+      if (!mounted) return;
+      setState(() => isLoading = false);
+    }
+  }
+
+  Future<void> _initializeEditCategoryBrand() async {
+    if (editCategoryId == null) return;
+
+    bool isPrimary = categoryItems.any((c) => c['id'] == editCategoryId);
+    if (isPrimary) {
+      selectedCategoryId = editCategoryId;
+      selectedSecondaryCategoryId = null;
+
+      final matchedItem = categoryItems.firstWhere(
+        (c) => c['id'] == editCategoryId,
+        orElse: () => {},
+      );
+
+      final rawSec = matchedItem['secondaryCategories'] ?? matchedItem['secondary_categories'] ?? [];
+      secondaryCategories = List<Map<String, dynamic>>.from(rawSec);
+
+      if (secondaryCategories.isEmpty || !hasSecondaryCategories) {
         final brandList = matchedItem['brands'] ?? [];
         final Map<int, Map<String, dynamic>> uniqueBrands = {};
         for (var brand in brandList) {
@@ -29,26 +230,298 @@ extension _ProductEntryPageStateLogic on _ProductEntryPageState {
             };
           }
         }
-        setState(() {
-          brands = uniqueBrands.values.toList();
-          selectedBrandId = editBrandId;
-        });
+        brands = uniqueBrands.values.toList();
+      }
+    } else {
+      int? parentPrimaryId;
+      Map<String, dynamic>? matchedSec;
+      List<Map<String, dynamic>> parentSecList = [];
 
-        if (editBrandId != null) {
-          await loadProducts(selectedCategoryId!, editBrandId!);
-          if (mounted) {
-            setState(() {
-              selectedProductId = widget.editItem?['product_id'];
-              selectedProductName = widget.editItem?['name'];
+      for (var cat in categoryItems) {
+        final rawSec = cat['secondaryCategories'] ?? cat['secondary_categories'] ?? [];
+        if (rawSec is List) {
+          for (var sec in rawSec) {
+            if (sec['id'] == editCategoryId) {
+              parentPrimaryId = cat['id'];
+              matchedSec = Map<String, dynamic>.from(sec);
+              parentSecList = List<Map<String, dynamic>>.from(rawSec);
+              break;
+            }
+          }
+        }
+        if (parentPrimaryId != null) break;
+      }
+
+      if (parentPrimaryId != null && matchedSec != null) {
+        selectedCategoryId = parentPrimaryId;
+        selectedSecondaryCategoryId = editCategoryId;
+        secondaryCategories = parentSecList;
+
+        final brandList = matchedSec['brands'] ?? [];
+        final Map<int, Map<String, dynamic>> uniqueBrands = {};
+        for (var brand in brandList) {
+          if (brand['id'] != null) {
+            uniqueBrands[brand['id']] = {
+              "id": brand['id'],
+              "name": brand['name'] ?? "No Name",
+            };
+          }
+        }
+        brands = uniqueBrands.values.toList();
+      } else {
+        selectedCategoryId = editCategoryId;
+      }
+    }
+
+    if (editBrandId != null) {
+      selectedBrandId = editBrandId;
+      await loadProducts(selectedSecondaryCategoryId ?? selectedCategoryId!, editBrandId!);
+      if (mounted) {
+        setState(() {
+          selectedProductId = widget.editItem?['product_id'];
+          selectedProductName = widget.editItem?['name'];
+        });
+      }
+    }
+  }
+
+  Future<void> onCategorySelected(int categoryId) async {
+    final matchedItem = categoryItems.firstWhere(
+      (c) => c['id'] == categoryId,
+      orElse: () => {},
+    );
+
+    setState(() {
+      selectedCategoryId = categoryId;
+      selectedSecondaryCategoryId = null;
+      secondaryCategories = [];
+      selectedBrandId = null;
+      brands = [];
+      products = [];
+      selectedProductId = null;
+      selectedProductName = null;
+      selectedProductMrp = null;
+      selectedProductCode = null;
+    });
+
+    // Check store setup brands first (exact brands assigned to this store category)
+    final rawBrandsFallback = matchedItem['brands'];
+    if (rawBrandsFallback is List && rawBrandsFallback.isNotEmpty) {
+      final List<Map<String, dynamic>> uniqueBrands = [];
+      for (var b in rawBrandsFallback) {
+        if (b != null && b['id'] != null) {
+          final bId = int.tryParse(b['id'].toString()) ?? 0;
+          uniqueBrands.add({
+            "id": bId,
+            "name": b['name']?.toString() ?? "No Name",
+            "code": b['code']?.toString() ?? "",
+            "image": b['image']?.toString() ?? "",
+          });
+        }
+      }
+      if (uniqueBrands.isNotEmpty) {
+        if (!mounted) return;
+        setState(() {
+          brands = uniqueBrands;
+        });
+        return;
+      }
+    }
+
+    // Fetch brands from API for this category
+    try {
+      final brandRes = await ApiService.getBrandsByCategory(categoryId: categoryId);
+      final rawBrands = brandRes['data'];
+      List<Map<String, dynamic>> parsedBrands = [];
+
+      if (rawBrands is List && rawBrands.isNotEmpty) {
+        for (var b in rawBrands) {
+          if (b != null && b['id'] != null) {
+            parsedBrands.add({
+              "id": int.tryParse(b['id'].toString()) ?? 0,
+              "name": b['name']?.toString() ?? "No Name",
+              "code": b['code']?.toString() ?? "",
+              "image": b['image']?.toString() ?? "",
             });
           }
         }
       }
+
+      if (parsedBrands.isNotEmpty) {
+        if (!mounted) return;
+        setState(() {
+          brands = parsedBrands;
+        });
+        return;
+      }
     } catch (e) {
-      AppLogger.error("INIT ERROR", e);
-    } finally {
+      debugPrint("Error fetching brands by category: $e");
+    }
+  }
+
+  Future<void> onSecondaryCategorySelected(int? secId) async {
+    if (secId == null) {
+      setState(() {
+        selectedSecondaryCategoryId = null;
+        selectedBrandId = null;
+        products = [];
+        selectedProductId = null;
+        selectedProductName = null;
+        selectedProductMrp = null;
+        selectedProductCode = null;
+      });
+
+      // Restore parent category's brands
+      if (selectedCategoryId != null) {
+        final matchedItem = categoryItems.firstWhere(
+          (c) => c['id'] == selectedCategoryId,
+          orElse: () => {},
+        );
+        final rawBrands = matchedItem['brands'];
+        if (rawBrands is List && rawBrands.isNotEmpty) {
+          final List<Map<String, dynamic>> parentBrands = [];
+          for (var b in rawBrands) {
+            if (b != null && b['id'] != null) {
+              parentBrands.add({
+                "id": int.tryParse(b['id'].toString()) ?? 0,
+                "name": b['name']?.toString() ?? "No Name",
+                "code": b['code']?.toString() ?? "",
+                "image": b['image']?.toString() ?? "",
+              });
+            }
+          }
+          if (parentBrands.isNotEmpty) {
+            setState(() {
+              brands = parentBrands;
+            });
+          }
+        }
+      }
+      return;
+    }
+
+    final matchedSec = secondaryCategories.firstWhere(
+      (s) => s['id'] == secId,
+      orElse: () => {},
+    );
+
+    setState(() {
+      selectedSecondaryCategoryId = secId;
+      selectedBrandId = null;
+      products = [];
+      selectedProductId = null;
+      selectedProductName = null;
+      selectedProductMrp = null;
+      selectedProductCode = null;
+    });
+
+    // Check store setup brands for this subcategory
+    final secBrands = matchedSec['brands'];
+    if (secBrands is List && secBrands.isNotEmpty) {
+      final List<Map<String, dynamic>> parsedBrands = [];
+      for (var b in secBrands) {
+        if (b != null && b['id'] != null) {
+          parsedBrands.add({
+            "id": int.tryParse(b['id'].toString()) ?? 0,
+            "name": b['name']?.toString() ?? "No Name",
+            "code": b['code']?.toString() ?? "",
+            "image": b['image']?.toString() ?? "",
+          });
+        }
+      }
+      if (parsedBrands.isNotEmpty) {
+        if (!mounted) return;
+        setState(() {
+          brands = parsedBrands;
+        });
+        return;
+      }
+    }
+
+    // Fallback: fetch brands for this subcategory from API
+    try {
+      final brandRes = await ApiService.getBrandsByCategory(categoryId: secId);
+      final rawBrands = brandRes['data'];
+      List<Map<String, dynamic>> parsedBrands = [];
+
+      if (rawBrands is List && rawBrands.isNotEmpty) {
+        for (var b in rawBrands) {
+          if (b != null && b['id'] != null) {
+            parsedBrands.add({
+              "id": int.tryParse(b['id'].toString()) ?? 0,
+              "name": b['name']?.toString() ?? "No Name",
+              "code": b['code']?.toString() ?? "",
+              "image": b['image']?.toString() ?? "",
+            });
+          }
+        }
+      }
+
+      if (parsedBrands.isNotEmpty) {
+        if (!mounted) return;
+        setState(() {
+          brands = parsedBrands;
+        });
+      }
+    } catch (e) {
+      debugPrint("Error fetching brands for subcategory: $e");
+    }
+  }
+
+  void onBrandSelected(int? brandId) {
+    setState(() {
+      selectedBrandId = brandId;
+      selectedProductId = null;
+      selectedProductName = null;
+      selectedProductMrp = null;
+      selectedProductCode = null;
+      products = [];
+    });
+    if (brandId != null && selectedCategoryId != null) {
+      loadProducts(selectedSecondaryCategoryId ?? selectedCategoryId!, brandId);
+    }
+  }
+
+  Future<void> _loadCategoriesFallback() async {
+    try {
+      final catRes = await ApiService.getCategoryList();
+      final catData = catRes['data'] ?? [];
+      final Map<int, Map<String, dynamic>> uniqueCategories = {};
+      rawCategoryBrandData.clear();
+
+      if (catData is List) {
+        for (var primary in catData) {
+          if (primary['id'] != null) {
+            uniqueCategories[primary['id']] = {
+              "id": primary['id'],
+              "name": primary['name'] ?? primary['category_name'] ?? "No Name",
+              "type": primary['category_type'] ?? "primary",
+            };
+
+            rawCategoryBrandData.add({
+              "category_id": primary['id'],
+              "category_name": primary['name'] ?? primary['category_name'] ?? "No Name",
+              "type": primary['category_type'] ?? "primary",
+              "brands": primary['brands'] ?? [],
+              "secondary_categories": primary['secondary_categories'] ?? [],
+            });
+          }
+        }
+      }
+
+      final sortedCategoryItems = uniqueCategories.values.toList();
+      sortedCategoryItems.sort((a, b) {
+        final nameA = (a['name']?.toString() ?? "").toLowerCase();
+        final nameB = (b['name']?.toString() ?? "").toLowerCase();
+        return nameA.compareTo(nameB);
+      });
+
       if (!mounted) return;
-      setState(() => isLoading = false);
+      setState(() {
+        categoryItems = sortedCategoryItems;
+      });
+    } catch (e) {
+      debugPrint("Error _loadCategoriesFallback: $e");
     }
   }
 
@@ -89,6 +562,11 @@ extension _ProductEntryPageStateLogic on _ProductEntryPageState {
 
       if (!mounted) return;
 
+      if (sortedCategoryItems.isEmpty) {
+        await _loadCategoriesFallback();
+        return;
+      }
+
       setState(() {
         categoryItems = sortedCategoryItems;
         secondaryCategories = [];
@@ -104,44 +582,84 @@ extension _ProductEntryPageStateLogic on _ProductEntryPageState {
 
     } catch (e) {
       debugPrint("Error loadCategoryBrandData: $e");
+      await _loadCategoriesFallback();
     }
+  }
+
+  List _extractProductList(dynamic res) {
+    if (res == null) return [];
+    if (res is List) return res;
+    if (res is Map) {
+      if (res['products'] is List) return res['products'];
+      if (res['data'] is List) return res['data'];
+      if (res['data'] is Map) {
+        if (res['data']['products'] is List) return res['data']['products'];
+        if (res['data']['data'] is List) return res['data']['data'];
+        if (res['data']['items'] is List) return res['data']['items'];
+      }
+      if (res['items'] is List) return res['items'];
+    }
+    return [];
   }
 
   Future<void> loadProducts(int categoryId, int brandId) async {
     List<Map<String, dynamic>> extracted = [];
-    try {
-      final res = await ApiService.getBrandProducts(
-        categoryId: categoryId,
-        brandId: brandId,
-      );
 
-      final raw = res['data']?['products'] ?? [];
-      for (var product in raw) {
-        if (product['id'] != null) {
-          final pName = product['name'] ?? "No Name";
+    void parseProductsList(List rawList) {
+      for (var p in rawList) {
+        if (p is Map && (p['id'] != null || p['product_id'] != null)) {
+          final pId = int.tryParse((p['id'] ?? p['product_id']).toString()) ?? 0;
+          if (pId == 0) continue;
+          final pName = (p['product_name'] ?? p['name'] ?? "Product #$pId").toString();
+          final pCode = (p['code'] ?? p['product_code'] ?? "").toString();
+          final pMrp = (p['mrp'] ?? p['price'] ?? "0.00").toString();
+
           extracted.add({
-            "id": product['id'],
+            "id": pId,
             "product_name": pName,
+            "code": pCode,
+            "mrp": pMrp,
           });
         }
       }
+    }
 
-      // Check if API returned empty product list due to database schema errors
+    try {
+      // 1. Direct Web API: GET https://billing.srivagroups.in/api/products/$brandId
+      try {
+        final resBrandId = await ApiService.getProductsByBrandId(brandId);
+        parseProductsList(_extractProductList(resBrandId));
+      } catch (e) {
+        debugPrint("getProductsByBrandId notice: $e");
+      }
+
+      // 2. Query getProductsByBrandAndCategory from srivagroups.in (with categoryId and brandId)
       if (extracted.isEmpty) {
-        debugPrint("No products returned from API. Using fallback mock products.");
-        extracted = [
-          {"id": 431, "product_name": "Huayu Common LCD/LED TV Remote Control"},
-          {"id": 432, "product_name": "Assembled Special Control Box"},
-          {"id": 433, "product_name": "Universal LED Backlight Driver"},
-        ];
+        try {
+          final res = await ApiService.getProductsByBrandAndCategory(
+            brandId: brandId,
+            categoryId: categoryId,
+          );
+          parseProductsList(_extractProductList(res));
+        } catch (e) {
+          debugPrint("getProductsByBrandAndCategory notice: $e");
+        }
+      }
+
+      // 3. Fallback: try getBrandProducts (existing billing API)
+      if (extracted.isEmpty) {
+        try {
+          final resFallback = await ApiService.getBrandProducts(
+            categoryId: categoryId,
+            brandId: brandId,
+          );
+          parseProductsList(_extractProductList(resFallback));
+        } catch (e) {
+          debugPrint("getBrandProducts notice: $e");
+        }
       }
     } catch (e) {
-      debugPrint("loadProducts error, using fallback: $e");
-      extracted = [
-        {"id": 431, "product_name": "Huayu Common LCD/LED TV Remote Control"},
-        {"id": 432, "product_name": "Assembled Special Control Box"},
-        {"id": 433, "product_name": "Universal LED Backlight Driver"},
-      ];
+      debugPrint("loadProducts error: $e");
     }
 
     final map = <int, Map<String, dynamic>>{};
@@ -153,8 +671,12 @@ extension _ProductEntryPageStateLogic on _ProductEntryPageState {
     if (!mounted) return;
     setState(() {
       products = finalVisibleProducts;
-      selectedProductId = null;
-      selectedProductName = null;
+      if (selectedProductId != null && !finalVisibleProducts.any((p) => p['id'] == selectedProductId)) {
+        selectedProductId = null;
+        selectedProductName = null;
+        selectedProductMrp = null;
+        selectedProductCode = null;
+      }
     });
   }
 
@@ -351,7 +873,7 @@ extension _ProductEntryPageStateLogic on _ProductEntryPageState {
       });
 
       // Load products
-      await loadProducts(selectedSecondaryCategoryId ?? selectedCategoryId!, selectedBrandId!);
+      await loadProducts(selectedCategoryId!, selectedBrandId!);
       if (!mounted) return;
 
       // Select targetProductId
@@ -417,13 +939,31 @@ extension _ProductEntryPageStateLogic on _ProductEntryPageState {
       editCategoryGroupId = null;
       editCategoryId = null;
       editBrandId = null;
+      selectedCategoryId = null;
+      selectedSecondaryCategoryId = null;
+      selectedBrandId = null;
+      selectedProductId = null;
       selectedProductName = null;
+      brands = [];
+      products = [];
       minQtyController.clear();
       maxQtyController.clear();
+      barcodeController.clear();
+      _autofilledText = null;
     });
   }
 
   Future<void> saveOrUpdate() async {
+    if (!canCreateProduct && !isOwner) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Permission Denied: You do not have permission to add/modify products."),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+      return;
+    }
+
     if (editAllocationId != null) {
       if (selectedProductName == null || minQtyController.text.isEmpty || maxQtyController.text.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -460,8 +1000,9 @@ extension _ProductEntryPageStateLogic on _ProductEntryPageState {
         setState(() => isLoading = false);
       }
     } else {
-      if (selectedCategoryGroupId == null ||
-          selectedCategoryId == null ||
+      final bool requiresSubCat = hasSecondaryCategories && secondaryCategories.isNotEmpty;
+      if (selectedCategoryId == null ||
+          (requiresSubCat && selectedSecondaryCategoryId == null) ||
           selectedBrandId == null ||
           selectedProductId == null ||
           selectedProductName == null) {
@@ -472,8 +1013,9 @@ extension _ProductEntryPageStateLogic on _ProductEntryPageState {
       }
 
       setState(() => isLoading = true);
+      final groupId = selectedCategoryGroupId ?? (categoryGroups.isNotEmpty ? categoryGroups.first.id! : 1);
       final success = await ApiService.saveProductAllocation(
-        categoryGroupId: selectedCategoryGroupId!,
+        categoryGroupId: groupId,
         categoryId: selectedSecondaryCategoryId ?? selectedCategoryId!,
         brandId: selectedBrandId!,
         productId: selectedProductId!,
@@ -500,6 +1042,12 @@ extension _ProductEntryPageStateLogic on _ProductEntryPageState {
           _autofilledText = null;
           isLoading = false;
         });
+
+        // Navigate to Product List page (ProductAllocationPage)
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const ProductAllocationPage()),
+        );
       } else {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(

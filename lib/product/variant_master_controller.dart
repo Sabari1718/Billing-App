@@ -5,11 +5,12 @@ class VariantMasterController extends GetxController {
   var variantTypes = <dynamic>[].obs;
   var allocations = <dynamic>[].obs;
   var products = <dynamic>[].obs;
-  
+
   var isLoadingVariants = true.obs;
-  var isLoadingAllocations = true.obs;
+  var isLoadingAllocations = false.obs;
   var isLoadingProducts = true.obs;
-  
+  var isSaving = false.obs;
+
   var selectedFilterProductId = RxnString();
   var showBanner = false.obs;
   var bannerText = ''.obs;
@@ -36,27 +37,124 @@ class VariantMasterController extends GetxController {
 
   Future<Map<String, String>> _headers() async {
     final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('auth_token') ?? prefs.getString('token') ?? '';
-    return {
-      'Authorization': 'Bearer $token',
+    final token = prefs.getString('billing_auth_token') ??
+        prefs.getString('auth_token') ??
+        prefs.getString('token') ??
+        '';
+
+    String cleanToken = token.trim();
+    if (cleanToken.startsWith('Bearer ')) {
+      cleanToken = cleanToken.substring(7).trim();
+    }
+
+    final bId = prefs.getString('selected_business_id') ??
+        prefs.get('business_id')?.toString() ??
+        '52';
+    final sId = prefs.getString('selected_store_id') ??
+        prefs.get('store_id')?.toString() ??
+        '38';
+    final pId = prefs.getString('selected_platform_id') ??
+        prefs.get('platform_id')?.toString() ??
+        '1';
+
+    final headers = {
       'Accept': 'application/json',
       'Content-Type': 'application/json',
+      'X-App-ID': 'Product94674',
+    };
+
+    if (cleanToken.isNotEmpty) {
+      headers['Authorization'] = 'Bearer $cleanToken';
+    }
+    if (bId.isNotEmpty) {
+      headers['x-business-id'] = bId;
+    }
+    if (sId.isNotEmpty) {
+      headers['x-store-id'] = sId;
+    }
+    if (pId.isNotEmpty) {
+      headers['x-platform-id'] = pId;
+    }
+
+    return headers;
+  }
+
+  Future<bool> _trySilentLogin() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final cachedEmail = prefs.getString("cached_email") ?? "";
+      final cachedPassword = prefs.getString("cached_password") ?? "";
+      if (cachedEmail.isNotEmpty && cachedPassword.isNotEmpty) {
+        final loginRes = await http.post(
+          Uri.parse("https://billing.srivagroups.in/api/auth/login"),
+          headers: {
+            "Accept": "application/json",
+            "Content-Type": "application/json",
+            "X-App-ID": "Product94674",
+          },
+          body: jsonEncode({"email": cachedEmail, "password": cachedPassword}),
+        ).timeout(const Duration(seconds: 10));
+
+        if (loginRes.statusCode == 200) {
+          final lDecoded = jsonDecode(loginRes.body);
+          final newToken = (lDecoded['token'] ?? lDecoded['data']?['token'])?.toString();
+          if (newToken != null && newToken.isNotEmpty) {
+            final clean = newToken.startsWith("Bearer ") ? newToken.substring(7).trim() : newToken.trim();
+            await prefs.setString("billing_auth_token", clean);
+            await prefs.setString("auth_token", clean);
+            await prefs.setString("token", clean);
+            return true;
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint("Silent login error in VariantMasterController: $e");
+    }
+    return false;
+  }
+
+  Future<Map<String, dynamic>> _getBusinessParams() async {
+    final prefs = await SharedPreferences.getInstance();
+    final bId = int.tryParse(prefs.getString('selected_business_id') ??
+            prefs.get('business_id')?.toString() ??
+            '52') ??
+        52;
+    final pId = int.tryParse(prefs.getString('selected_platform_id') ??
+            prefs.get('platform_id')?.toString() ??
+            '1') ??
+        1;
+    final sId = int.tryParse(prefs.getString('selected_store_id') ??
+            prefs.get('store_id')?.toString() ??
+            '38') ??
+        38;
+
+    return {
+      'business_id': bId,
+      'platform_id': pId,
+      'store_id': sId,
     };
   }
 
-  Future<String> _queryParams() async {
-    final prefs = await SharedPreferences.getInstance();
-    final bId = prefs.getString('selected_business_id') ?? prefs.get('business_id')?.toString() ?? '';
-    final uId = prefs.getString('user_main_id') ?? '';
-    final q = [if (bId.isNotEmpty) 'business_id=$bId', if (uId.isNotEmpty) 'user_main_id=$uId'];
-    return q.isNotEmpty ? '?${q.join('&')}' : '';
-  }
-
+  /// 1. GET https://billing.srivagroups.in/api/variant-master
   Future<void> fetchVariants() async {
     isLoadingVariants.value = true;
     try {
-      const url = 'https://billing.srivagroups.in/api/variant-master';
-      final res = await http.get(Uri.parse(url), headers: await _headers());
+      final bParams = await _getBusinessParams();
+      final bId = bParams['business_id'] ?? 52;
+      final sId = bParams['store_id'] ?? 38;
+      final pId = bParams['platform_id'] ?? 1;
+
+      final url = 'https://billing.srivagroups.in/api/variant-master?business_id=$bId&store_id=$sId&platform_id=$pId';
+      var res = await http.get(Uri.parse(url), headers: await _headers());
+      debugPrint('fetchVariants [${res.statusCode}]: ${res.body}');
+
+      if (res.statusCode == 401 || (res.statusCode == 400 && res.body.contains("Session expired"))) {
+        if (await _trySilentLogin()) {
+          res = await http.get(Uri.parse(url), headers: await _headers());
+          debugPrint('fetchVariants retry [${res.statusCode}]: ${res.body}');
+        }
+      }
+
       if (res.statusCode == 200) {
         final decoded = jsonDecode(res.body);
         List list = [];
@@ -69,128 +167,286 @@ class VariantMasterController extends GetxController {
             list = decoded['variants'];
           }
         }
-        if (list.isNotEmpty) {
-          variantTypes.assignAll(list);
-          return;
-        }
-      }
 
-      // Fallback with query parameters
-      final q = await _queryParams();
-      if (q.isNotEmpty) {
-        final res2 = await http.get(Uri.parse('$url$q'), headers: await _headers());
-        if (res2.statusCode == 200) {
-          final decoded = jsonDecode(res2.body);
-          List list = (decoded is Map && decoded.containsKey('data'))
-              ? (decoded['data'] as List)
-              : (decoded is List ? decoded : []);
-          if (list.isNotEmpty) {
-            variantTypes.assignAll(list);
-            return;
+        // Show all active (non-deleted) variants from backend exactly as web does
+        final activeList = list.where((item) {
+          if (item is Map) {
+            final isDel = item['is_deleted'];
+            if (isDel == 1 || isDel == true || isDel == '1') return false;
+            return true;
           }
-        }
-      }
+          return true;
+        }).toList();
 
-      // Default mock if empty or first load
-      if (variantTypes.isEmpty) {
-        variantTypes.assignAll([
-          {'id': 1, 'name': 'Original', 'variant_name': 'Original'},
-          {'id': 2, 'name': 'Imported', 'variant_name': 'Imported'},
-        ]);
+        variantTypes.assignAll(activeList);
+        if (selectedProductIdForVariants.value != null) {
+          updateConfigMapping(selectedProductIdForVariants.value!);
+        }
+      } else {
+        toast('Failed to load variants (${res.statusCode})');
       }
     } catch (e) {
       debugPrint('fetchVariants error: $e');
-      if (variantTypes.isEmpty) {
-        variantTypes.assignAll([
-          {'id': 1, 'name': 'Original', 'variant_name': 'Original'},
-          {'id': 2, 'name': 'Imported', 'variant_name': 'Imported'},
-        ]);
-      }
+      toast('Error loading variants: $e');
     } finally {
       isLoadingVariants.value = false;
     }
   }
 
-  Future<void> createVariant(String name) async {
-    final newItem = {
-      'id': DateTime.now().millisecondsSinceEpoch,
-      'name': name,
-      'variant_name': name,
-    };
-    variantTypes.add(newItem);
-    variantTypes.refresh();
-    toast('Variant created successfully!');
+  /// 2. POST https://billing.srivagroups.in/api/variant-master
+  Future<bool> createVariant(String name) async {
+    final cleanName = name.trim();
+    if (cleanName.isEmpty) return false;
 
+    isSaving.value = true;
     try {
-      const url = 'https://billing.srivagroups.in/api/variant-master';
-      final prefs = await SharedPreferences.getInstance();
-      final bId = prefs.getString('selected_business_id') ?? prefs.get('business_id')?.toString() ?? '';
-      final uId = prefs.getString('user_main_id') ?? '';
-      
+      final bParams = await _getBusinessParams();
+      final bId = bParams['business_id'] ?? 52;
+      final pId = bParams['platform_id'] ?? 1;
+      final sId = bParams['store_id'] ?? 38;
+
+      final url = 'https://billing.srivagroups.in/api/variant-master?business_id=$bId&store_id=$sId&platform_id=$pId';
       final body = {
-        'name': name,
-        'variant_name': name,
-        'variantName': name,
-        if (bId.isNotEmpty) 'business_id': int.tryParse(bId) ?? bId,
-        if (uId.isNotEmpty) 'user_main_id': int.tryParse(uId) ?? uId,
+        'name': cleanName,
+        'variant_name': cleanName,
+        'business_id': bId,
+        'platform_id': pId,
+        'store_id': sId,
+        'businessId': bId,
+        'platformId': pId,
+        'storeId': sId,
       };
 
-      await http.post(Uri.parse(url), headers: await _headers(), body: jsonEncode(body));
+      debugPrint('createVariant request: ${jsonEncode(body)}');
+      var res = await http.post(
+        Uri.parse(url),
+        headers: await _headers(),
+        body: jsonEncode(body),
+      );
+      debugPrint('createVariant response [${res.statusCode}]: ${res.body}');
+
+      if (res.statusCode == 401 || (res.statusCode == 400 && res.body.contains("Session expired"))) {
+        if (await _trySilentLogin()) {
+          res = await http.post(
+            Uri.parse(url),
+            headers: await _headers(),
+            body: jsonEncode(body),
+          );
+          debugPrint('createVariant retry response [${res.statusCode}]: ${res.body}');
+        }
+      }
+
+      if (res.statusCode == 200 || res.statusCode == 201) {
+        toast('Variant "$cleanName" created successfully!');
+        await fetchVariants();
+        return true;
+      } else {
+        final decoded = jsonDecode(res.body);
+        final msg = decoded is Map
+            ? (decoded['message'] ?? 'Failed to create variant')
+            : 'Failed to create variant (${res.statusCode})';
+        toast(msg.toString());
+        return false;
+      }
     } catch (e) {
-      debugPrint('createVariant network error: $e');
+      debugPrint('createVariant error: $e');
+      toast('Error: $e');
+      return false;
+    } finally {
+      isSaving.value = false;
     }
   }
 
-  Future<void> updateVariant(dynamic id, String name) async {
-    final idx = variantTypes.indexWhere((e) => e['id']?.toString() == id.toString());
-    if (idx != -1) {
-      variantTypes[idx] = {
-        'id': id,
-        'name': name,
-        'variant_name': name,
-      };
-      variantTypes.refresh();
-    }
-    toast('Variant updated successfully!');
+  /// 3. PUT https://billing.srivagroups.in/api/variant-master/{id}
+  Future<bool> updateVariant(dynamic id, String name) async {
+    final cleanName = name.trim();
+    if (cleanName.isEmpty) return false;
 
+    isSaving.value = true;
     try {
-      final url = 'https://billing.srivagroups.in/api/variant-master/$id';
+      final bParams = await _getBusinessParams();
+      final bId = bParams['business_id'] ?? 52;
+      final pId = bParams['platform_id'] ?? 1;
+      final sId = bParams['store_id'] ?? 38;
+
+      final url = 'https://billing.srivagroups.in/api/variant-master/$id?business_id=$bId&store_id=$sId&platform_id=$pId';
       final body = {
-        'name': name,
-        'variant_name': name,
-        'variantName': name,
+        'name': cleanName,
+        'variant_name': cleanName,
+        'business_id': bId,
+        'platform_id': pId,
+        'store_id': sId,
+        'businessId': bId,
+        'platformId': pId,
+        'storeId': sId,
       };
 
-      await http.put(Uri.parse(url), headers: await _headers(), body: jsonEncode(body));
+      debugPrint('updateVariant request: ${jsonEncode(body)}');
+      var res = await http.put(
+        Uri.parse(url),
+        headers: await _headers(),
+        body: jsonEncode(body),
+      );
+      debugPrint('updateVariant response [${res.statusCode}]: ${res.body}');
+
+      if (res.statusCode == 405 || res.statusCode == 404) {
+        // Fallback to PATCH if PUT is not allowed
+        res = await http.patch(
+          Uri.parse(url),
+          headers: await _headers(),
+          body: jsonEncode(body),
+        );
+        debugPrint('updateVariant PATCH fallback response [${res.statusCode}]: ${res.body}');
+      }
+
+      if (res.statusCode == 401 || (res.statusCode == 400 && res.body.contains("Session expired"))) {
+        if (await _trySilentLogin()) {
+          res = await http.put(
+            Uri.parse(url),
+            headers: await _headers(),
+            body: jsonEncode(body),
+          );
+          debugPrint('updateVariant retry response [${res.statusCode}]: ${res.body}');
+        }
+      }
+
+      if (res.statusCode == 200 || res.statusCode == 201 || res.statusCode == 204) {
+        toast('Variant "$cleanName" updated successfully!');
+        await fetchVariants();
+        return true;
+      } else {
+        final decoded = jsonDecode(res.body);
+        final msg = decoded is Map
+            ? (decoded['message'] ?? 'Failed to update variant')
+            : 'Failed to update variant (${res.statusCode})';
+        toast(msg.toString());
+        return false;
+      }
     } catch (e) {
-      debugPrint('updateVariant network error: $e');
+      debugPrint('updateVariant error: $e');
+      toast('Error: $e');
+      return false;
+    } finally {
+      isSaving.value = false;
     }
   }
 
-  Future<void> deleteVariant(dynamic id) async {
-    variantTypes.removeWhere((e) => e['id']?.toString() == id.toString());
-    variantTypes.refresh();
-    toast('Variant deleted successfully!');
-
+  /// 4. DELETE https://billing.srivagroups.in/api/variant-master/{id}
+  Future<bool> deleteVariant(dynamic id) async {
+    isSaving.value = true;
     try {
-      final url = 'https://billing.srivagroups.in/api/variant-master/$id';
-      await http.delete(Uri.parse(url), headers: await _headers());
+      final bParams = await _getBusinessParams();
+      final bId = bParams['business_id'] ?? 52;
+      final sId = bParams['store_id'] ?? 38;
+      final pId = bParams['platform_id'] ?? 1;
+
+      final url = 'https://billing.srivagroups.in/api/variant-master/$id?business_id=$bId&store_id=$sId&platform_id=$pId';
+      debugPrint('deleteVariant request: $url');
+      var res = await http.delete(
+        Uri.parse(url),
+        headers: await _headers(),
+      );
+      debugPrint('deleteVariant response [${res.statusCode}]: ${res.body}');
+
+      if (res.statusCode == 401 || (res.statusCode == 400 && res.body.contains("Session expired"))) {
+        if (await _trySilentLogin()) {
+          res = await http.delete(
+            Uri.parse(url),
+            headers: await _headers(),
+          );
+          debugPrint('deleteVariant retry response [${res.statusCode}]: ${res.body}');
+        }
+      }
+
+      if (res.statusCode == 200 || res.statusCode == 204) {
+        toast('Variant deleted successfully!');
+        await fetchVariants();
+        return true;
+      } else {
+        final decoded = jsonDecode(res.body);
+        final msg = decoded is Map
+            ? (decoded['message'] ?? 'Failed to delete variant')
+            : 'Failed to delete variant (${res.statusCode})';
+        toast(msg.toString());
+        return false;
+      }
     } catch (e) {
-      debugPrint('deleteVariant network error: $e');
+      debugPrint('deleteVariant error: $e');
+      toast('Error: $e');
+      return false;
+    } finally {
+      isSaving.value = false;
     }
   }
 
+  /// 5. GET https://billing.srivagroups.in/api/productAllocation
+  Future<void> fetchProducts() async {
+    isLoadingProducts.value = true;
+    try {
+      const url = 'https://billing.srivagroups.in/api/productAllocation';
+      final res = await http.get(Uri.parse(url), headers: await _headers());
+      debugPrint('fetchProducts [${res.statusCode}]');
+
+      if (res.statusCode == 200) {
+        final decoded = jsonDecode(res.body);
+        List list = [];
+        if (decoded is List) {
+          list = decoded;
+        } else if (decoded is Map && decoded['data'] is List) {
+          list = decoded['data'];
+        }
+
+        List parsedProducts = [];
+        for (var item in list) {
+          if (item is Map) {
+            final pId = (item['product_id'] ?? item['id'])?.toString() ?? '';
+            final pName = (item['product_name'] ?? item['name'])?.toString() ?? '';
+            final allocId = (item['allocation_id'] ?? pId).toString();
+            if (pId.isNotEmpty && pName.isNotEmpty) {
+              parsedProducts.add({
+                'id': pId,
+                'name': pName,
+                'allocation_id': allocId,
+                'mrp': (item['mrp'] ?? '').toString(),
+                'brand_name': (item['brand_name'] ?? '').toString(),
+                'base_image': (item['base_image'] ?? '').toString(),
+                'category_name': (item['secondary_category_name'] ??
+                        item['primary_category_name'] ??
+                        '')
+                    .toString(),
+                'min_qty': (item['min_qty'] ?? '0').toString(),
+                'max_qty': (item['max_qty'] ?? '999').toString(),
+              });
+            }
+          }
+        }
+        products.assignAll(parsedProducts);
+
+        if (selectedProductIdForVariants.value == null && parsedProducts.isNotEmpty) {
+          selectedProductIdForVariants.value = parsedProducts.first['id'];
+          updateConfigMapping(parsedProducts.first['id']);
+        }
+      }
+    } catch (e) {
+      debugPrint('fetchProducts error: $e');
+    } finally {
+      isLoadingProducts.value = false;
+    }
+  }
+
+  /// 6. GET https://billing.srivagroups.in/api/variant-master/product-variants
   Future<void> fetchAllocations() async {
     isLoadingAllocations.value = true;
     try {
-      final q = await _queryParams();
-      final url = 'https://billing.srivagroups.in/api/variant-master/product-variants$q';
-      final headers = await _headers();
-      final res = await http.get(Uri.parse(url), headers: headers);
+      const url = 'https://billing.srivagroups.in/api/variant-master/product-variants';
+      final res = await http.get(Uri.parse(url), headers: await _headers());
+      debugPrint('fetchAllocations [${res.statusCode}]');
+
       if (res.statusCode == 200) {
         final decoded = jsonDecode(res.body);
-        List list = (decoded is Map && decoded.containsKey('data')) 
-            ? decoded['data'] : (decoded is List ? decoded : []);
+        List list = (decoded is Map && decoded.containsKey('data'))
+            ? decoded['data']
+            : (decoded is List ? decoded : []);
         allocations.assignAll(list);
         if (selectedProductIdForVariants.value != null) {
           updateConfigMapping(selectedProductIdForVariants.value!);
@@ -206,21 +462,21 @@ class VariantMasterController extends GetxController {
   Future<void> createAllocation(Map<String, dynamic> data) async {
     try {
       const url = 'https://billing.srivagroups.in/api/variant-master/product-variants';
-      final prefs = await SharedPreferences.getInstance();
-      final bId = prefs.getString('selected_business_id') ?? prefs.get('business_id')?.toString() ?? '';
-      final uId = prefs.getString('user_main_id') ?? '';
-      
+      final bParams = await _getBusinessParams();
       final body = {
         ...data,
-        if (bId.isNotEmpty) 'business_id': int.tryParse(bId) ?? bId,
-        if (uId.isNotEmpty) 'user_main_id': int.tryParse(uId) ?? uId,
+        ...bParams,
       };
 
-      final res = await http.post(Uri.parse(url), headers: await _headers(), body: jsonEncode(body));
+      final res = await http.post(
+        Uri.parse(url),
+        headers: await _headers(),
+        body: jsonEncode(body),
+      );
       if (res.statusCode == 200 || res.statusCode == 201) {
         toast('Variant allocated successfully!');
       } else {
-        toast('Failed to save allocation');
+        toast('Failed to save allocation (${res.statusCode})');
       }
     } catch (e) {
       toast('Error: $e');
@@ -230,11 +486,21 @@ class VariantMasterController extends GetxController {
   Future<void> updateAllocation(int id, Map<String, dynamic> data) async {
     try {
       final url = 'https://billing.srivagroups.in/api/variant-master/product-variants/$id';
-      final res = await http.put(Uri.parse(url), headers: await _headers(), body: jsonEncode(data));
+      final bParams = await _getBusinessParams();
+      final body = {
+        ...data,
+        ...bParams,
+      };
+
+      final res = await http.put(
+        Uri.parse(url),
+        headers: await _headers(),
+        body: jsonEncode(body),
+      );
       if (res.statusCode == 200) {
         toast('Allocation updated successfully!');
       } else {
-        toast('Failed to update allocation');
+        toast('Failed to update allocation (${res.statusCode})');
       }
     } catch (e) {
       toast('Error: $e');
@@ -248,116 +514,23 @@ class VariantMasterController extends GetxController {
       if (res.statusCode == 200) {
         toast('Allocation deleted successfully!');
       } else {
-        toast('Failed to delete allocation');
+        toast('Failed to delete allocation (${res.statusCode})');
       }
     } catch (e) {
       toast('Error: $e');
     }
   }
 
-  Future<void> fetchProducts() async {
-    isLoadingProducts.value = true;
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final role = prefs.getString('role')?.toLowerCase() ?? 'propagater';
-      final userName = prefs.getString('user_name') ?? '';
-
-      final q = await _queryParams();
-      final url = 'https://billing.srivagroups.in/api/productAllocation$q';
-      final res = await http.get(Uri.parse(url), headers: await _headers());
-
-      if (res.statusCode == 200) {
-        final decoded = jsonDecode(res.body);
-        List list = (decoded is Map && decoded.containsKey('data')) 
-            ? decoded['data'] : (decoded is List ? decoded : []);
-        
-        List parsedProducts = [];
-        for (var allocation in list) {
-          if (allocation is Map) {
-            final supplierName = allocation['supplier_name'] ?? allocation['supplier']?['name'] ?? "Unknown Supplier";
-            
-            if (role != "propagater" && role != "propagator" && role != "admin" && userName.isNotEmpty) {
-              if (!supplierName.toString().toLowerCase().contains(userName.toLowerCase())) {
-                continue;
-              }
-            }
-
-            if (allocation['Products'] is List) {
-              final productsList = allocation['Products'] as List;
-              for (var prod in productsList) {
-                if (prod is Map) {
-                  parsedProducts.add({
-                    'id': prod['id']?.toString() ?? '',
-                    'name': prod['name']?.toString() ?? '',
-                    'allocation_id': prod['allocation_id']?.toString() ?? '',
-                  });
-                }
-              }
-            }
-            else if (allocation['Categories'] is Map) {
-              final categoriesMap = allocation['Categories'] as Map;
-              
-              void processCategoryList(List? catList) {
-                if (catList == null) return;
-                for (var category in catList) {
-                  if (category is Map && category['Brand'] is List) {
-                    final brandList = category['Brand'] as List;
-                    for (var brand in brandList) {
-                      if (brand is Map && brand['Products'] is List) {
-                        final productsList = brand['Products'] as List;
-                        for (var prod in productsList) {
-                          if (prod is Map) {
-                            parsedProducts.add({
-                              'id': prod['id']?.toString() ?? '',
-                              'name': prod['name']?.toString() ?? '',
-                              'allocation_id': prod['allocation_id']?.toString() ?? '',
-                            });
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-
-              if (categoriesMap['primary'] is List) {
-                processCategoryList(categoriesMap['primary'] as List);
-              }
-              if (categoriesMap['secondary'] is List) {
-                processCategoryList(categoriesMap['secondary'] as List);
-              }
-            }
-            else {
-              final idVal = (allocation['id'] ?? allocation['product_id'] ?? allocation['productId'])?.toString() ?? '';
-              final nameVal = (allocation['name'] ?? allocation['product_name'] ?? allocation['productName'] ?? '').toString();
-              final allocId = (allocation['allocation_id'] ?? allocation['allocationId'] ?? idVal).toString();
-              if (idVal.isNotEmpty && nameVal.isNotEmpty) {
-                parsedProducts.add({
-                  'id': idVal,
-                  'name': nameVal,
-                  'allocation_id': allocId,
-                });
-              }
-            }
-          }
-        }
-        products.assignAll(parsedProducts);
-      }
-    } catch (e) {
-      debugPrint('fetchProducts error: $e');
-    } finally {
-      isLoadingProducts.value = false;
-    }
-  }
-
   void updateConfigMapping(String productId) {
     selectedVariantConfigs.clear();
-    final productAllocations = allocations.where((a) => a['product_id']?.toString() == productId).toList();
-    
+    final productAllocations =
+        allocations.where((a) => a['product_id']?.toString() == productId).toList();
+
     for (var v in variantTypes) {
       final vName = (v['name'] ?? v['variant_name'] ?? '').toString();
-      final existing = productAllocations.firstWhereOrNull((a) => (a['variant'] ?? a['variant_name'] ?? '').toString() == vName);
-      
+      final existing = productAllocations.firstWhereOrNull(
+          (a) => (a['variant'] ?? a['variant_name'] ?? '').toString() == vName);
+
       if (existing != null) {
         bool wEnabled = false;
         String wDur = '1';
@@ -369,7 +542,7 @@ class VariantMasterController extends GetxController {
           wDur = wDuration;
           wUnit = wType.capitalizeFirst ?? 'Months';
         }
-        
+
         bool gEnabled = false;
         String gDur = '1';
         String gUnit = 'Months';
@@ -380,11 +553,19 @@ class VariantMasterController extends GetxController {
           gDur = gDuration;
           gUnit = gType.capitalizeFirst ?? 'Months';
         }
-        
+
         selectedVariantConfigs[vName] = {
           'checked': true,
-          'minStock': (existing['min_qty'] ?? existing['min_stock'] ?? existing['minStock'] ?? '0').toString(),
-          'maxStock': (existing['max_qty'] ?? existing['max_stock'] ?? existing['maxStock'] ?? '999').toString(),
+          'minStock': (existing['min_qty'] ??
+                  existing['min_stock'] ??
+                  existing['minStock'] ??
+                  '0')
+              .toString(),
+          'maxStock': (existing['max_qty'] ??
+                  existing['max_stock'] ??
+                  existing['maxStock'] ??
+                  '999')
+              .toString(),
           'warrantyEnabled': wEnabled,
           'warrantyDuration': wDur,
           'warrantyUnit': wUnit,
@@ -411,22 +592,24 @@ class VariantMasterController extends GetxController {
   Future<void> saveAllocations() async {
     final productId = selectedProductIdForVariants.value;
     if (productId == null) return;
-    
+
     final matchProd = products.firstWhereOrNull((p) => p['id']?.toString() == productId);
     final pName = matchProd != null ? (matchProd['name']?.toString() ?? '') : '';
-    
-    final existingAllocations = allocations.where((a) => a['product_id']?.toString() == productId).toList();
-    
+
+    final existingAllocations =
+        allocations.where((a) => a['product_id']?.toString() == productId).toList();
+
     for (var v in variantTypes) {
       final vName = (v['name'] ?? v['variant_name'] ?? '').toString();
       final vId = v['id'] as int? ?? 0;
-      
+
       final config = selectedVariantConfigs[vName];
       if (config == null) continue;
-      
+
       final isChecked = config['checked'] == true;
-      final existing = existingAllocations.firstWhereOrNull((a) => (a['variant'] ?? a['variant_name'] ?? '').toString() == vName);
-      
+      final existing = existingAllocations.firstWhereOrNull(
+          (a) => (a['variant'] ?? a['variant_name'] ?? '').toString() == vName);
+
       if (isChecked) {
         final data = {
           'product_id': int.tryParse(productId) ?? 0,
@@ -444,14 +627,26 @@ class VariantMasterController extends GetxController {
           'max_qty': int.tryParse(config['maxStock']?.toString() ?? '999') ?? 999,
           'max_stock': int.tryParse(config['maxStock']?.toString() ?? '999') ?? 999,
           'maxStock': int.tryParse(config['maxStock']?.toString() ?? '999') ?? 999,
-          'warranty': config['warrantyEnabled'] == true ? '${config['warrantyDuration']} ${config['warrantyUnit']}' : '',
-          'warranty_duration': config['warrantyEnabled'] == true ? (int.tryParse(config['warrantyDuration']?.toString() ?? '') ?? 0) : 0,
-          'warranty_duration_type': config['warrantyEnabled'] == true ? config['warrantyUnit']?.toString().toLowerCase() : '',
-          'guarantee': config['guaranteeEnabled'] == true ? '${config['guaranteeDuration']} ${config['guaranteeUnit']}' : '',
-          'guarantee_duration': config['guaranteeEnabled'] == true ? (int.tryParse(config['guaranteeDuration']?.toString() ?? '') ?? 0) : 0,
-          'guarantee_duration_type': config['guaranteeEnabled'] == true ? config['guaranteeUnit']?.toString().toLowerCase() : '',
+          'warranty': config['warrantyEnabled'] == true
+              ? '${config['warrantyDuration']} ${config['warrantyUnit']}'
+              : '',
+          'warranty_duration': config['warrantyEnabled'] == true
+              ? (int.tryParse(config['warrantyDuration']?.toString() ?? '') ?? 0)
+              : 0,
+          'warranty_duration_type': config['warrantyEnabled'] == true
+              ? config['warrantyUnit']?.toString().toLowerCase()
+              : '',
+          'guarantee': config['guaranteeEnabled'] == true
+              ? '${config['guaranteeDuration']} ${config['guaranteeUnit']}'
+              : '',
+          'guarantee_duration': config['guaranteeEnabled'] == true
+              ? (int.tryParse(config['guaranteeDuration']?.toString() ?? '') ?? 0)
+              : 0,
+          'guarantee_duration_type': config['guaranteeEnabled'] == true
+              ? config['guaranteeUnit']?.toString().toLowerCase()
+              : '',
         };
-        
+
         if (existing != null) {
           final id = existing['id'] as int;
           await updateAllocation(id, data);
@@ -465,7 +660,7 @@ class VariantMasterController extends GetxController {
         }
       }
     }
-    
+
     await fetchAllocations();
     toast('Allocations saved successfully!');
   }
