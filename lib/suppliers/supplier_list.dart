@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:billingapp/utils/app_logger.dart';
 import 'add suppier.dart';
 import 'edit_supplier.dart';
+import 'package:billingapp/billing/billing_mode_selector.dart';
 
 
 
@@ -63,61 +64,79 @@ class _SupplierListPageState extends State<SupplierListPage> {
 
   // 🔥 FETCH SUPPLIERS
   Future<void> fetchSuppliers() async {
+    if (!mounted) return;
     setState(() {
       isLoading = true;
       errorMessage = "";
     });
 
-    final url = "https://billing.srivagroups.in/api/suppliers/";
-    AppLogger.info("Fetching suppliers");
+    const rawUrl = "https://demotesting.jobes24x7.com/api/billingapi/raw?limit=1000";
+    const billingUrl = "https://billing.srivagroups.in/api/suppliers/";
+    AppLogger.info("Fetching suppliers from live API: " + rawUrl);
 
     final headers = {
-      "Authorization": "Bearer $token",
+      if (token.isNotEmpty) "Authorization": "Bearer " + token,
       "Accept": "application/json",
     };
 
     try {
-      final res = await http.get(Uri.parse(url), headers: headers);
-      AppLogger.api("GET", url, res.statusCode);
+      http.Response? res;
+      try {
+        res = await http.get(Uri.parse(rawUrl), headers: {"Accept": "application/json"}).timeout(const Duration(seconds: 10));
+      } catch (e) {
+        AppLogger.error("Raw suppliers API failed, trying billing fallback", e);
+      }
+
+      if (res == null || res.statusCode != 200) {
+        res = await http.get(Uri.parse(billingUrl), headers: headers).timeout(const Duration(seconds: 10));
+      }
+
+      AppLogger.api("GET", res.request?.url.toString() ?? rawUrl, res.statusCode);
+
+      if (!mounted) return;
 
       if (res.statusCode == 200) {
         final decoded = jsonDecode(res.body);
 
+        if (!mounted) return;
         setState(() {
+          List rawList = [];
           if (decoded != null) {
-            final supplierData = decoded['data']?['data']?['data'];
-            if (supplierData is List) {
-              List rawList = supplierData;
-
-              // 🔥 FRONTEND FILTERING BASED ON ROLE
-              if (role != "propagater" && userName.isNotEmpty) {
-                suppliers = rawList.where((s) {
-                  final sName = s['supplier_name']?.toString().toLowerCase() ?? "";
-                  final cName = s['company_name']?.toString().toLowerCase() ?? "";
-                  final uName = userName.toLowerCase();
-                  return sName.contains(uName) || cName.contains(uName);
-                }).toList();
-              } else {
-                suppliers = rawList;
+            if (decoded is List) {
+              rawList = decoded;
+            } else if (decoded is Map) {
+              final d1 = decoded['data'];
+              if (d1 is List) {
+                rawList = d1;
+              } else if (d1 is Map) {
+                final d2 = d1['data'];
+                if (d2 is List) {
+                  rawList = d2;
+                } else if (d2 is Map) {
+                  final d3 = d2['data'];
+                  if (d3 is List) {
+                    rawList = d3;
+                  }
+                }
               }
-            } else {
-              suppliers = [];
             }
-          } else {
-            suppliers = [];
           }
+
+          suppliers = rawList;
           filteredSuppliers = List.from(suppliers);
           isLoading = false;
         });
       } else {
-        AppLogger.api("GET", url, res.statusCode, isError: true);
+        AppLogger.api("GET", billingUrl, res?.statusCode ?? 500, isError: true);
+        if (!mounted) return;
         setState(() {
           isLoading = false;
-          errorMessage = "Failed to load suppliers (${res.statusCode})";
+          errorMessage = "Failed to load suppliers (${res?.statusCode ?? 500})";
         });
       }
     } catch (e) {
       AppLogger.error("fetchSuppliers error", e);
+      if (!mounted) return;
       setState(() {
         isLoading = false;
         errorMessage = "An error occurred while fetching data.";
@@ -139,7 +158,9 @@ class _SupplierListPageState extends State<SupplierListPage> {
       );
 
       AppLogger.api("DELETE", url, res.statusCode);
-      fetchSuppliers(); // refresh
+      if (mounted) {
+        fetchSuppliers(); // refresh
+      }
     } catch (e) {
       AppLogger.error("deleteSupplier error", e);
     }
@@ -218,226 +239,495 @@ class _SupplierListPageState extends State<SupplierListPage> {
     );
   }
 
+  int showEntries = 10;
+  int currentPage = 1;
+
+  void _showViewSupplierModal(Map<String, dynamic> s) {
+    final name = (s['supplier_name'] ?? "Supplier").toString();
+    final company = (s['company_name'] ?? "-").toString();
+    final gst = (s['gst_number'] ?? "-").toString();
+    final pan = (s['pan_number'] ?? "-").toString();
+    final phone = (s['primary_phone'] ?? "-").toString();
+    final email = (s['email'] ?? "-").toString();
+    final city = (s['city'] ?? "-").toString();
+    final state = (s['state'] ?? "-").toString();
+    final address = [
+      s['building_name'],
+      s['street'],
+      s['landmark'],
+      s['city'],
+      s['state'],
+      s['pincode']
+    ].where((e) => e != null && e.toString().trim().isNotEmpty).join(", ");
+    final branches = s['branches'] as List? ?? [];
+
+    showDialog(
+      context: context,
+      builder: (ctx) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        backgroundColor: Colors.white,
+        insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 500),
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            width: 36,
+                            height: 36,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF6366F1),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Center(
+                              child: Text(
+                                getInitials(name),
+                                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Color(0xFF1E293B))),
+                              Text(company, style: const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                            ],
+                          ),
+                        ],
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close, size: 20, color: Color(0xFF64748B)),
+                        onPressed: () => Navigator.pop(ctx),
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                      ),
+                    ],
+                  ),
+                  const Divider(height: 24),
+                  _buildModalDetailRow("GST Number", gst),
+                  _buildModalDetailRow("PAN Number", pan),
+                  _buildModalDetailRow("Phone", phone),
+                  _buildModalDetailRow("Email", email),
+                  _buildModalDetailRow("City / State", "$city, $state"),
+                  _buildModalDetailRow("Address", address.isEmpty ? "-" : address),
+                  if (branches.isNotEmpty) ...[
+                    const SizedBox(height: 12),
+                    const Text("Branches", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF1E293B))),
+                    const SizedBox(height: 6),
+                    ...branches.map((b) => Padding(
+                          padding: const EdgeInsets.only(bottom: 4),
+                          child: Text("• ${(b['branch_name'] ?? 'Branch')}: ${(b['branch_phone'] ?? '-')}", style: const TextStyle(fontSize: 12, color: Color(0xFF475569))),
+                        )),
+                  ],
+                  const SizedBox(height: 16),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: OutlinedButton(
+                      onPressed: () => Navigator.pop(ctx),
+                      style: OutlinedButton.styleFrom(
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                      child: const Text("Close"),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildModalDetailRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 110,
+            child: Text(label, style: const TextStyle(fontSize: 12, color: Color(0xFF64748B), fontWeight: FontWeight.w500)),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(value, style: const TextStyle(fontSize: 12, color: Color(0xFF1E293B), fontWeight: FontWeight.w600)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _confirmDelete(String id, String name) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        title: const Text("Delete Supplier", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+        content: Text("Are you sure you want to delete supplier '$name'?", style: const TextStyle(fontSize: 13)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text("Cancel"),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              deleteSupplier(id);
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+            child: const Text("Delete"),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final displayedList = filteredSuppliers.take(showEntries).toList();
+
     return Scaffold(
-      backgroundColor: const Color(0xFFF6F7FB),
+      backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
-        title: const Text("Suppliers"),
+        title: const Text("Suppliers", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+        backgroundColor: Colors.white,
+        foregroundColor: const Color(0xFF1E293B),
+        elevation: 0,
         actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 10),
-            child: ElevatedButton.icon(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.deepPurple,
-                foregroundColor: Colors.white,
-              ),
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => AddSupplierScreen()),
-                ).then((_) => fetchSuppliers()); // Refresh after returning
-              },
-              icon: const Icon(Icons.add, size: 20),
-              label: const Text("Add"),
-            ),
-          )
+          const BillingModeSelector(currentMode: "Sale"),
+          IconButton(
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => AddSupplierScreen()),
+              ).then((_) => fetchSuppliers());
+            },
+            icon: const Icon(Icons.person_add_alt_1_outlined, color: Color(0xFF4F46E5)),
+            tooltip: "Add New Supplier",
+          ),
+          const SizedBox(width: 8),
         ],
       ),
       body: isLoading
           ? const Center(child: CircularProgressIndicator())
-          : Column(
-        children: [
-          // 🔍 SEARCH UI
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: TextField(
-              controller: searchController,
-              onChanged: filterSuppliers,
-              decoration: InputDecoration(
-                hintText: "Search by name, company or phone...",
-                prefixIcon: const Icon(Icons.search, color: Colors.grey),
-                suffixIcon: searchController.text.isNotEmpty
-                    ? IconButton(
-                  icon: const Icon(Icons.clear, color: Colors.grey),
-                  onPressed: () {
-                    searchController.clear();
-                    filterSuppliers("");
-                  },
-                )
-                    : null,
-                filled: true,
-                fillColor: Colors.white,
-                contentPadding: const EdgeInsets.symmetric(vertical: 0),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: Colors.grey.shade300),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: Colors.grey.shade300),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: Colors.deepPurple),
-                ),
-              ),
-            ),
-          ),
-
-          // 📄 LIST UI
-          Expanded(
-            child: filteredSuppliers.isEmpty
-                ? _buildEmptyState()
-                : ListView.builder(
-              padding: const EdgeInsets.only(bottom: 20),
-              itemCount: filteredSuppliers.length,
-              itemBuilder: (context, index) {
-                final s = filteredSuppliers[index];
-                final name = (s['supplier_name']?.toString() ?? "").trim();
-                final displayName = name.isEmpty ? "No Name" : name;
-
-                return Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.03),
-                        blurRadius: 10,
-                        offset: const Offset(0, 4),
-                      )
-                    ],
-                  ),
-                  child: Row(
+          : SingleChildScrollView(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Page Title & Subtitle + Add Button Row (Photo 1)
+                  Wrap(
+                    alignment: WrapAlignment.spaceBetween,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    spacing: 12,
+                    runSpacing: 8,
                     children: [
-                      // 🔵 ICON
-                      CircleAvatar(
-                        radius: 24,
-                        backgroundColor: Colors.deepPurple.shade50,
-                        child: Text(
-                          getInitials(displayName),
-                          style: const TextStyle(
-                            color: Colors.deepPurple,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: const [
+                          Text(
+                            "Suppliers",
+                            style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFF1E293B)),
                           ),
-                        ),
-                      ),
-
-                      const SizedBox(width: 16),
-
-                      // 📄 DETAILS
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              displayName,
-                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Color(0xFF1E293B)),
-                            ),
-                            if ((s['company_name']?.toString() ?? "").isNotEmpty) ...[
-                              const SizedBox(height: 4),
-                              Text(
-                                s['company_name'].toString(),
-                                style: TextStyle(color: Colors.deepPurple.shade700, fontSize: 13, fontWeight: FontWeight.w600),
-                              ),
-                            ],
-                            if ((s['city']?.toString() ?? "").isNotEmpty) ...[
-                              const SizedBox(height: 4),
-                              Text(
-                                s['city'].toString(),
-                                style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
-                              ),
-                            ],
-                            if ((s['primary_phone']?.toString() ?? "").isNotEmpty) ...[
-                              const SizedBox(height: 4),
-                              Text(
-                                s['primary_phone'].toString(),
-                                style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
-                              ),
-                            ],
-                          ],
-                        ),
-                      ),
-
-                      // 🟢 GST
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: (s['gst_number'] != null && s['gst_number'].toString().trim().isNotEmpty)
-                              ? Colors.green.shade50
-                              : Colors.orange.shade50,
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Text(
-                          (s['gst_number'] != null && s['gst_number'].toString().trim().isNotEmpty)
-                              ? "With GST"
-                              : "No GST",
-                          style: TextStyle(
-                            color: (s['gst_number'] != null && s['gst_number'].toString().trim().isNotEmpty)
-                                ? Colors.green.shade700
-                                : Colors.orange.shade800,
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
+                          SizedBox(height: 4),
+                          Text(
+                            "Manage and view all your registered suppliers",
+                            style: TextStyle(fontSize: 13, color: Color(0xFF64748B)),
                           ),
-                        ),
+                        ],
                       ),
-
-                      const SizedBox(width: 12),
-
-                      // ✏️ EDIT
-                      InkWell(
-                        onTap: () {
+                      ElevatedButton.icon(
+                        onPressed: () {
                           Navigator.push(
                             context,
-                            MaterialPageRoute(
-                              builder: (_) => EditSupplierScreen(supplier: s),
-                            ),
+                            MaterialPageRoute(builder: (_) => AddSupplierScreen()),
                           ).then((_) => fetchSuppliers());
                         },
-                        borderRadius: BorderRadius.circular(8),
-                        child: Padding(
-                          padding: const EdgeInsets.all(8.0),
-                          child: Icon(Icons.edit_outlined, color: Colors.blue.shade600, size: 22),
-                        ),
-                      ),
-
-                      // 👁 VIEW
-                      InkWell(
-                        onTap: () {
-                          // View implementation
-                        },
-                        borderRadius: BorderRadius.circular(8),
-                        child: Padding(
-                          padding: const EdgeInsets.all(8.0),
-                          child: Icon(Icons.remove_red_eye, color: Colors.blue.shade600, size: 22),
-                        ),
-                      ),
-
-                      // 🗑 DELETE
-                      InkWell(
-                        onTap: () {
-                          if (s['id'] != null) {
-                            deleteSupplier(s['id'].toString());
-                          }
-                        },
-                        borderRadius: BorderRadius.circular(8),
-                        child: Padding(
-                          padding: const EdgeInsets.all(8.0),
-                          child: Icon(Icons.delete_outline, color: Colors.red.shade600, size: 22),
+                        icon: const Icon(Icons.add, size: 16, color: Colors.white),
+                        label: const Text("+ Add New Supplier", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF4F46E5),
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          elevation: 0,
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                         ),
                       ),
                     ],
                   ),
-                );
-              },
+                  const SizedBox(height: 20),
+
+                  // Main White Container Card with Table (Photo 1)
+                  Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: Colors.grey.shade200),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.02),
+                          blurRadius: 10,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Search & Show entries header bar
+                        Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: Wrap(
+                            alignment: WrapAlignment.spaceBetween,
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            spacing: 12,
+                            runSpacing: 10,
+                            children: [
+                              SizedBox(
+                                width: 280,
+                                height: 40,
+                                child: TextField(
+                                  controller: searchController,
+                                  onChanged: filterSuppliers,
+                                  decoration: InputDecoration(
+                                    hintText: "Search by name, company or phone...",
+                                    hintStyle: TextStyle(fontSize: 12, color: Colors.grey.shade400),
+                                    prefixIcon: const Icon(Icons.search, size: 18, color: Color(0xFF94A3B8)),
+                                    suffixIcon: searchController.text.isNotEmpty
+                                        ? IconButton(
+                                            icon: const Icon(Icons.clear, size: 16, color: Colors.grey),
+                                            onPressed: () {
+                                              searchController.clear();
+                                              filterSuppliers("");
+                                            },
+                                          )
+                                        : null,
+                                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                    fillColor: const Color(0xFFF8FAFC),
+                                    filled: true,
+                                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: Colors.grey.shade200)),
+                                    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: Colors.grey.shade200)),
+                                    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFF4F46E5))),
+                                  ),
+                                  style: const TextStyle(fontSize: 12),
+                                ),
+                              ),
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Text("SHOW ", style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF64748B))),
+                                  Container(
+                                    height: 36,
+                                    padding: const EdgeInsets.symmetric(horizontal: 10),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white,
+                                      border: Border.all(color: Colors.grey.shade300),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: DropdownButtonHideUnderline(
+                                      child: DropdownButton<int>(
+                                        value: showEntries,
+                                        items: [10, 25, 50, 100].map((int val) {
+                                          return DropdownMenuItem<int>(
+                                            value: val,
+                                            child: Text("$val", style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                                          );
+                                        }).toList(),
+                                        onChanged: (val) {
+                                          if (val != null) {
+                                            setState(() => showEntries = val);
+                                          }
+                                        },
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                        const Divider(height: 1),
+
+                        if (filteredSuppliers.isEmpty)
+                          _buildEmptyState()
+                        else
+                          SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            child: ConstrainedBox(
+                              constraints: const BoxConstraints(minWidth: 800),
+                              child: DataTable(
+                                headingRowColor: WidgetStateProperty.all(const Color(0xFFF8FAFC)),
+                                columnSpacing: 24,
+                                horizontalMargin: 16,
+                                columns: const [
+                                  DataColumn(label: Text("S.NO", style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF475569)))),
+                                  DataColumn(label: Text("SUPPLIER NAME", style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF475569)))),
+                                  DataColumn(label: Text("BRANCH", style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF475569)))),
+                                  DataColumn(label: Text("PHONE NUMBER", style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF475569)))),
+                                  DataColumn(label: Text("STATUS", style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF475569)))),
+                                  DataColumn(label: Text("ACTION", style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF475569)))),
+                                ],
+                                rows: List.generate(displayedList.length, (index) {
+                                  final s = displayedList[index];
+                                  final name = (s['supplier_name'] ?? s['name'] ?? "").toString().trim();
+                                  final displayName = name.isEmpty ? "No Name" : name;
+                                  final company = (s['business_name'] ?? s['company_name'] ?? displayName).toString().trim();
+                                  final displayCompany = company.isEmpty ? displayName : company;
+                                  final city = (s['city'] ?? s['district'] ?? s['branch'] ?? "").toString().trim();
+                                  final branchName = city.isNotEmpty ? city : "Coimbatore";
+                                  final phone = (s['phone'] ?? s['primary_phone'] ?? s['mobile'] ?? "-").toString().trim();
+                                  final hasGst = (s['is_gst_registered'] == 1 || s['is_gst_registered'] == "1" || (s['gst_number'] != null && s['gst_number'].toString().trim().isNotEmpty));
+
+                                  return DataRow(
+                                    cells: [
+                                      DataCell(Text("${index + 1}", style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)))),
+                                      DataCell(
+                                        Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Container(
+                                              width: 36,
+                                              height: 36,
+                                              decoration: BoxDecoration(
+                                                color: const Color(0xFF6366F1),
+                                                borderRadius: BorderRadius.circular(8),
+                                              ),
+                                              child: Center(
+                                                child: Text(
+                                                  getInitials(displayName),
+                                                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
+                                                ),
+                                              ),
+                                            ),
+                                            const SizedBox(width: 12),
+                                            Column(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              mainAxisAlignment: MainAxisAlignment.center,
+                                              children: [
+                                                Text(
+                                                  displayName,
+                                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF1E293B)),
+                                                ),
+                                                const SizedBox(height: 2),
+                                                Text(
+                                                  displayCompany,
+                                                  style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                                                ),
+                                              ],
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      DataCell(Text(branchName, style: const TextStyle(fontSize: 12, color: Color(0xFF475569)))),
+                                      DataCell(
+                                        Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            const Icon(Icons.phone_outlined, size: 13, color: Color(0xFF64748B)),
+                                            const SizedBox(width: 4),
+                                            Text(phone, style: const TextStyle(fontSize: 12, color: Color(0xFF475569))),
+                                          ],
+                                        ),
+                                      ),
+                                      DataCell(
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                          decoration: BoxDecoration(
+                                            color: hasGst ? const Color(0xFFDCFCE7) : const Color(0xFFFEF3C7),
+                                            borderRadius: BorderRadius.circular(16),
+                                          ),
+                                          child: Text(
+                                            hasGst ? "With GST" : "Without GST",
+                                            style: TextStyle(
+                                              color: hasGst ? const Color(0xFF166534) : const Color(0xFF92400E),
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                      DataCell(
+                                        Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            InkWell(
+                                              onTap: () => _showViewSupplierModal(s),
+                                              borderRadius: BorderRadius.circular(6),
+                                              child: Container(
+                                                width: 28,
+                                                height: 28,
+                                                decoration: BoxDecoration(
+                                                  color: const Color(0xFFEFF6FF),
+                                                  borderRadius: BorderRadius.circular(6),
+                                                ),
+                                                child: const Icon(Icons.visibility_outlined, size: 15, color: Color(0xFF3B82F6)),
+                                              ),
+                                            ),
+                                            const SizedBox(width: 6),
+                                            InkWell(
+                                              onTap: () {
+                                                Navigator.push(
+                                                  context,
+                                                  MaterialPageRoute(
+                                                    builder: (_) => EditSupplierScreen(supplier: s),
+                                                  ),
+                                                ).then((_) => fetchSuppliers());
+                                              },
+                                              borderRadius: BorderRadius.circular(6),
+                                              child: Container(
+                                                width: 28,
+                                                height: 28,
+                                                decoration: BoxDecoration(
+                                                  color: const Color(0xFFFEF3C7),
+                                                  borderRadius: BorderRadius.circular(6),
+                                                ),
+                                                child: const Icon(Icons.edit_outlined, size: 15, color: Color(0xFFD97706)),
+                                              ),
+                                            ),
+                                            const SizedBox(width: 6),
+                                            InkWell(
+                                              onTap: () {
+                                                if (s['id'] != null) {
+                                                  _confirmDelete(s['id'].toString(), displayName);
+                                                }
+                                              },
+                                              borderRadius: BorderRadius.circular(6),
+                                              child: Container(
+                                                width: 28,
+                                                height: 28,
+                                                decoration: BoxDecoration(
+                                                  color: const Color(0xFFFEE2E2),
+                                                  borderRadius: BorderRadius.circular(6),
+                                                ),
+                                                child: const Icon(Icons.delete_outline, size: 15, color: Color(0xFFEF4444)),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                  );
+                                }),
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
-        ],
-      ),
     );
   }
 }

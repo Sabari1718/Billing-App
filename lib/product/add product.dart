@@ -122,12 +122,14 @@ class _ProductEntryPageState extends State<ProductEntryPage> {
   void initState() {
     super.initState();
     if (widget.editItem != null) {
-      editAllocationId = widget.editItem!['id'];
-      editCategoryGroupId = widget.editItem!['category_group_id'];
-      editCategoryId = widget.editItem!['category_id'];
-      editBrandId = widget.editItem!['brand_id'];
-      selectedProductId = widget.editItem!['product_id'];
-      selectedProductName = widget.editItem!['name'];
+      editAllocationId = int.tryParse(widget.editItem!['id']?.toString() ?? "");
+      editCategoryGroupId = int.tryParse(widget.editItem!['category_group_id']?.toString() ?? "");
+      editCategoryId = int.tryParse(widget.editItem!['category_id']?.toString() ?? "");
+      editBrandId = int.tryParse(widget.editItem!['brand_id']?.toString() ?? "");
+      selectedProductId = int.tryParse(widget.editItem!['product_id']?.toString() ?? "");
+      selectedProductName = widget.editItem!['name']?.toString();
+      selectedProductMrp = widget.editItem!['mrp']?.toString();
+      selectedProductCode = widget.editItem!['code']?.toString();
       minQtyController.text = widget.editItem!['min']?.toString() ?? "";
       maxQtyController.text = widget.editItem!['max']?.toString() ?? "";
     }

@@ -8,52 +8,118 @@ extension _PurchaseBillEntryPageStateWidgets on _PurchaseBillEntryPageState {
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: Colors.grey.shade200),
       ),
-      padding: const EdgeInsets.all(20),
-      child: Column(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      child: Row(
         children: [
-          _buildStepRow(
-            1,
-            "Supplier & Metadata",
-            "Step 1",
-            currentStep > 1,
-            currentStep == 1,
-          ),
-          const Padding(
-            padding: EdgeInsets.only(left: 17, top: 4, bottom: 4),
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: SizedBox(
-                height: 24,
-                child: VerticalDivider(color: Colors.grey, width: 2, thickness: 1),
-              ),
+          Expanded(
+            child: _buildHorizontalStepItem(
+              1,
+              "STEP 1",
+              "Supplier & Metadata",
+              currentStep == 1,
+              currentStep > 1,
             ),
           ),
-          _buildStepRow(
-            2,
-            "Products Purchase Entry",
-            "Step 2",
-            currentStep > 2,
-            currentStep == 2,
+          Container(
+            width: 20,
+            height: 1,
+            margin: const EdgeInsets.symmetric(horizontal: 4),
+            color: currentStep > 1 ? const Color(0xFF6366F1) : Colors.grey.shade300,
           ),
-          const Padding(
-            padding: EdgeInsets.only(left: 17, top: 4, bottom: 4),
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: SizedBox(
-                height: 24,
-                child: VerticalDivider(color: Colors.grey, width: 2, thickness: 1),
-              ),
+          Expanded(
+            child: _buildHorizontalStepItem(
+              2,
+              "STEP 2",
+              "Products Purchase Entry",
+              currentStep == 2,
+              currentStep > 2,
             ),
           ),
-          _buildStepRow(
-            3,
-            "Payment & Summary",
-            "Step 3",
-            false,
-            currentStep == 3,
+          Container(
+            width: 20,
+            height: 1,
+            margin: const EdgeInsets.symmetric(horizontal: 4),
+            color: currentStep > 2 ? const Color(0xFF6366F1) : Colors.grey.shade300,
+          ),
+          Expanded(
+            child: _buildHorizontalStepItem(
+              3,
+              "STEP 3",
+              "Payment & Summary",
+              currentStep == 3,
+              false,
+            ),
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildHorizontalStepItem(int stepNum, String stepLabel, String title, bool isActive, bool isCompleted) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 26,
+          height: 26,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: isActive
+                ? const Color(0xFF6366F1)
+                : isCompleted
+                    ? const Color(0xFF10B981)
+                    : Colors.white,
+            border: Border.all(
+              color: isActive
+                  ? const Color(0xFF6366F1)
+                  : isCompleted
+                      ? const Color(0xFF10B981)
+                      : Colors.grey.shade300,
+              width: 1.5,
+            ),
+          ),
+          child: Center(
+            child: isCompleted
+                ? const Icon(Icons.check, color: Colors.white, size: 14)
+                : Text(
+                    "$stepNum",
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      color: isActive ? Colors.white : Colors.grey.shade600,
+                    ),
+                  ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Flexible(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                stepLabel,
+                style: TextStyle(
+                  fontSize: 9,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.grey.shade500,
+                  letterSpacing: 0.5,
+                ),
+              ),
+              Text(
+                title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: isActive ? FontWeight.bold : FontWeight.w500,
+                  color: isActive ? const Color(0xFF6366F1) : const Color(0xFF475569),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 
@@ -555,14 +621,14 @@ extension _PurchaseBillEntryPageStateWidgets on _PurchaseBillEntryPageState {
               side: BorderSide(color: Colors.grey.shade300),
             ),
             child: Text(
-              currentStep > 1 ? "Back" : "Cancel",
+              currentStep == 2 ? "Back to Supplier" : (currentStep > 1 ? "Back" : "Cancel"),
               style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF475569)),
             ),
           ),
           ElevatedButton(
             onPressed: isSubmitting ? null : _handleNextOrSubmit,
             style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primary,
+              backgroundColor: const Color(0xFF0D6EFD),
               foregroundColor: Colors.white,
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
@@ -579,9 +645,9 @@ extension _PurchaseBillEntryPageStateWidgets on _PurchaseBillEntryPageState {
                     children: [
                       Text(
                         currentStep == 1
-                            ? "Next: Products"
+                            ? "Next: Product Entry"
                             : currentStep == 2
-                                ? "Next: Payment"
+                                ? "Next: Payment & Summary"
                                 : "Submit Bill",
                         style: const TextStyle(fontWeight: FontWeight.bold),
                       ),

@@ -67,18 +67,50 @@ class ApiService {
 
   /// ✅ HEADERS
   static Future<Map<String, String>> _getHeaders({bool auth = false}) async {
-    final headers = {
+    final prefs = await SharedPreferences.getInstance();
+    final platformId = prefs.getString("selected_platform_id") ??
+        prefs.getString("platform_id") ??
+        prefs.getString("platformId") ??
+        "1";
+    final businessId = prefs.getString("selected_business_id") ??
+        prefs.getString("business_id") ??
+        prefs.getString("businessId") ??
+        prefs.get("business_id")?.toString() ??
+        "52";
+    final storeId = prefs.getString("selected_store_id") ??
+        prefs.getString("store_id") ??
+        prefs.getString("storeId") ??
+        prefs.get("store_id")?.toString() ??
+        "";
+
+    final headers = <String, String>{
       "Accept": "application/json",
       "Content-Type": "application/json",
       "X-App-ID": "Product94674",
+      "x-platform-id": platformId,
+      "platform-id": platformId,
+      "platformId": platformId,
+      "x-business-id": businessId,
+      "business-id": businessId,
+      "businessId": businessId,
     };
 
+    if (storeId.isNotEmpty) {
+      headers["x-store-id"] = storeId;
+      headers["store-id"] = storeId;
+      headers["storeId"] = storeId;
+    }
+
     if (auth) {
-      final prefs = await SharedPreferences.getInstance();
-      final token = prefs.getString("billing_auth_token") ?? prefs.getString("auth_token");
+      final token = prefs.getString("billing_auth_token") ??
+          prefs.getString("auth_token") ??
+          prefs.getString("token");
 
       if (token != null && token.isNotEmpty) {
-        headers["Authorization"] = "Bearer $token";
+        final cleanToken = token.trim().startsWith("Bearer ")
+            ? token.trim().substring(7).trim()
+            : token.trim();
+        headers["Authorization"] = "Bearer $cleanToken";
       }
     }
 
@@ -103,6 +135,7 @@ class ApiService {
     }
   }
 
+
   /// ✅ LOGIN
   static Future<Map<String, dynamic>> loginUser(Map data) async {
     try {
@@ -114,9 +147,13 @@ class ApiService {
 
       final response = _handleResponse(res);
 
-      if (response["token"] != null) {
+      final token = response["token"] ?? response["data"]?["token"];
+      if (token != null) {
         final prefs = await SharedPreferences.getInstance();
-        await prefs.setString("auth_token", response["token"]);
+        final tokenStr = token.toString();
+        await prefs.setString("auth_token", tokenStr);
+        await prefs.setString("billing_auth_token", tokenStr);
+        await prefs.setString("token", tokenStr);
       }
 
       return response;
@@ -154,9 +191,17 @@ class ApiService {
     const url = "/auth/select-business";
     try {
       _logApiRequest("SELECT BUSINESS", "POST", url);
+      final headers = await _getHeaders(auth: true);
+      if (data["business_id"] != null) {
+        final bIdVal = data["business_id"].toString();
+        headers["x-business-id"] = bIdVal;
+        headers["business-id"] = bIdVal;
+        headers["businessId"] = bIdVal;
+      }
+
       final res = await http.post(
         Uri.parse("$baseUrl$url"),
-        headers: await _getHeaders(auth: true),
+        headers: headers,
         body: jsonEncode(data),
       );
       final success = res.statusCode >= 200 && res.statusCode < 300;
@@ -193,6 +238,14 @@ class ApiService {
           await prefs.setString("business_type", businessData["type"].toString());
           await prefs.setString("role", businessData["type"].toString()); // Sync role for existing logic
         }
+
+        // Clean stale platform & store selections for new business
+        await prefs.remove("selected_platform_id");
+        await prefs.remove("platform_id");
+        await prefs.remove("selected_store_id");
+        await prefs.remove("store_id");
+        await prefs.remove("store_name");
+        await prefs.remove("selected_store_name");
       }
 
       return response;
@@ -221,19 +274,132 @@ class ApiService {
   }
 
   /// ✅ GET SALES BILLS
-  static Future<Map<String, dynamic>> getSalesBills() async {
-    const url = "/sales/bills";
+  static Future<Map<String, dynamic>> getSalesBills({String? businessId, String? platformId, String? storeId}) async {
+    final prefs = await SharedPreferences.getInstance();
+    final bId = businessId ??
+        prefs.getString("selected_business_id") ??
+        prefs.getString("business_id") ??
+        prefs.get("business_id")?.toString() ??
+        "52";
+    final pId = platformId ??
+        prefs.getString("selected_platform_id") ??
+        prefs.getString("platform_id") ??
+        "1";
+    final sId = storeId ??
+        prefs.getString("selected_store_id") ??
+        prefs.getString("store_id") ??
+        prefs.get("store_id")?.toString() ??
+        "";
+
+    // 1. Primary endpoint used on web: /api/bills
+    String billsUrl = "/bills?business_id=$bId";
+    if (pId.isNotEmpty) billsUrl += "&platform_id=$pId";
+    if (sId.isNotEmpty) billsUrl += "&store_id=$sId";
+
+    try {
+      final headers = await _getHeaders(auth: true);
+      headers["x-platform-id"] = pId;
+      headers["platform-id"] = pId;
+      headers["x-business-id"] = bId;
+      if (sId.isNotEmpty) {
+        headers["x-store-id"] = sId;
+        headers["store-id"] = sId;
+      }
+
+      _logApiRequest("GET BILLS (PRIMARY)", "GET", billsUrl);
+      final res = await http.get(Uri.parse("$baseUrl$billsUrl"), headers: headers);
+      if (res.statusCode >= 200 && res.statusCode < 300) {
+        final parsed = _handleResponse(res);
+        final list = parsed['data'] is List ? parsed['data'] : (parsed['bills'] is List ? parsed['bills'] : null);
+        if (list != null && (list as List).isNotEmpty) {
+          _logApiResponse("GET BILLS (PRIMARY)", res.statusCode, res.body, success: true);
+          return parsed;
+        }
+      }
+    } catch (_) {}
+
+    // 2. Fallback endpoint: /api/sales/bills
+    final url = "/sales/bills?business_id=$bId&businessId=$bId&platform_id=$pId&platformId=$pId${sId.isNotEmpty ? '&store_id=$sId&storeId=$sId' : ''}";
     try {
       _logApiRequest("GET SALES BILLS", "GET", url);
+      final headers = await _getHeaders(auth: true);
+      headers["x-platform-id"] = pId;
+      headers["platform-id"] = pId;
+      headers["x-business-id"] = bId;
+      if (sId.isNotEmpty) {
+        headers["x-store-id"] = sId;
+        headers["store-id"] = sId;
+      }
+
       final res = await http.get(
         Uri.parse("$baseUrl$url"),
-        headers: await _getHeaders(auth: true),
+        headers: headers,
       );
       final success = res.statusCode >= 200 && res.statusCode < 300;
       _logApiResponse("GET SALES BILLS", res.statusCode, res.body, success: success);
-      return _handleResponse(res);
+      
+      final result = _handleResponse(res);
+      // Fallback: if data is empty with token, try without token
+      if (result['data'] == null || (result['data'] is List && (result['data'] as List).isEmpty)) {
+        try {
+          final fallbackHeaders = await _getHeaders(auth: false);
+          fallbackHeaders["x-platform-id"] = pId;
+          fallbackHeaders["x-business-id"] = bId;
+          if (sId.isNotEmpty) fallbackHeaders["x-store-id"] = sId;
+          final fallbackRes = await http.get(
+            Uri.parse("$baseUrl$url"),
+            headers: fallbackHeaders,
+          );
+          if (fallbackRes.statusCode >= 200 && fallbackRes.statusCode < 300) {
+            return _handleResponse(fallbackRes);
+          }
+        } catch (_) {}
+      }
+      return result;
     } catch (e, stackTrace) {
       _logApiError("Get Sales Bills API", "GET", url, e, stackTrace);
+      return {};
+    }
+  }
+
+  /// ✅ GET PURCHASE BILLS
+  static Future<Map<String, dynamic>> getPurchaseBills({String? businessId, String? platformId, String? storeId}) async {
+    final prefs = await SharedPreferences.getInstance();
+    final bId = businessId ??
+        prefs.getString("selected_business_id") ??
+        prefs.getString("business_id") ??
+        prefs.get("business_id")?.toString() ??
+        "52";
+    final pId = platformId ??
+        prefs.getString("selected_platform_id") ??
+        prefs.getString("platform_id") ??
+        "1";
+    final sId = storeId ??
+        prefs.getString("selected_store_id") ??
+        prefs.getString("store_id") ??
+        prefs.get("store_id")?.toString() ??
+        "";
+    final url = "/purchase-bill/bills?business_id=$bId&businessId=$bId&platform_id=$pId&platformId=$pId${sId.isNotEmpty ? '&store_id=$sId&storeId=$sId' : ''}";
+    try {
+      _logApiRequest("GET PURCHASE BILLS", "GET", url);
+      final headers = await _getHeaders(auth: true);
+      headers["x-platform-id"] = pId;
+      headers["platform-id"] = pId;
+      headers["x-business-id"] = bId;
+      if (sId.isNotEmpty) {
+        headers["x-store-id"] = sId;
+        headers["store-id"] = sId;
+      }
+
+      final res = await http.get(
+        Uri.parse("$baseUrl$url"),
+        headers: headers,
+      );
+      final success = res.statusCode >= 200 && res.statusCode < 300;
+      _logApiResponse("GET PURCHASE BILLS", res.statusCode, res.body, success: success);
+      return _handleResponse(res);
+    } catch (e, stackTrace) {
+      _logApiError("Get Purchase Bills API", "GET", url, e, stackTrace);
       return {};
     }
   }
@@ -1548,16 +1714,20 @@ class ApiService {
       if (response["success"] == true &&
           response["data"] is List &&
           (response["data"] as List).isNotEmpty) {
-        final firstStore = response["data"][0];
-        if (firstStore["store_id"] != null) {
-          await prefs.setString(
-              "selected_store_id", firstStore["store_id"].toString());
-          await prefs.setInt(
-              "store_id", int.tryParse(firstStore["store_id"].toString()) ?? 0);
-        }
-        if (firstStore["store_name"] != null) {
-          await prefs.setString(
-              "selected_store_name", firstStore["store_name"].toString());
+        final existingStoreId = prefs.getString("selected_store_id");
+        // Only set default if no store was previously chosen by user
+        if (existingStoreId == null || existingStoreId.isEmpty) {
+          final firstStore = response["data"][0];
+          if (firstStore["store_id"] != null) {
+            final sIdStr = firstStore["store_id"].toString();
+            await prefs.setString("selected_store_id", sIdStr);
+            await prefs.setString("store_id", sIdStr);
+          }
+          if (firstStore["store_name"] != null) {
+            final sNameStr = firstStore["store_name"].toString();
+            await prefs.setString("selected_store_name", sNameStr);
+            await prefs.setString("store_name", sNameStr);
+          }
         }
       }
 

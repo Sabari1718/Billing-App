@@ -40,63 +40,162 @@ extension _CustomerScreenStateWidgets on _CustomerScreenState {
   }
 
   Widget _buildSelectedCustomerCompact(Customer customer) {
+    final bool isUnregistered = customer.type.toLowerCase().contains("unreg") || customer.type.isEmpty;
+    final String cType = customer.type.trim().isEmpty ? "Unregistered" : customer.type;
+    final String addr = customer.address.trim().isEmpty ? "-" : customer.address;
+
     return Container(
-      padding: const EdgeInsets.all(16),
+      width: double.infinity,
+      margin: const EdgeInsets.only(top: 14),
+      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.grey.shade100),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.02),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Header Row: Customer Name [ UNREGISTERED ] / [ ✔ VERIFIED ] [close]
           Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              Text(
-                customer.name,
-                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF1E293B)),
-              ),
-              const SizedBox(width: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                decoration: BoxDecoration(
-                  color: Colors.green.shade50,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Row(
-                  children: [
-                    Icon(Icons.check_circle, size: 12, color: Colors.green.shade700),
-                    const SizedBox(width: 4),
-                    Text("Verified", style: TextStyle(color: Colors.green.shade700, fontWeight: FontWeight.bold, fontSize: 10)),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              Icon(Icons.phone_outlined, size: 14, color: Colors.grey.shade400),
-              const SizedBox(width: 6),
-              Text(customer.mobile, style: TextStyle(color: Colors.grey.shade600, fontSize: 13)),
-            ],
-          ),
-          const SizedBox(height: 4),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Icon(Icons.location_on_outlined, size: 14, color: Colors.grey.shade400),
-              const SizedBox(width: 6),
               Expanded(
                 child: Text(
-                  customer.address.isEmpty ? "No address provided" : customer.address,
-                  style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
+                  customer.name.trim().isEmpty ? "CUSTOMER" : customer.name.toUpperCase(),
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF0F172A),
+                    letterSpacing: 0.3,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
+              const SizedBox(width: 8),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: isUnregistered ? const Color(0xFFFFF7ED) : const Color(0xFFF0FDF4),
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(
+                        color: isUnregistered ? const Color(0xFFFED7AA) : const Color(0xFFBBF7D0),
+                      ),
+                    ),
+                    child: Text(
+                      isUnregistered ? "UNREGISTERED" : "✔ VERIFIED",
+                      style: TextStyle(
+                        color: isUnregistered ? const Color(0xFFEA580C) : const Color(0xFF16A34A),
+                        fontWeight: FontWeight.bold,
+                        fontSize: 10,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  InkWell(
+                    onTap: () {
+                      setState(() {
+                        selectedCustomer = null;
+                        _searchController.clear();
+                        results = [];
+                      });
+                    },
+                    borderRadius: BorderRadius.circular(12),
+                    child: const Padding(
+                      padding: EdgeInsets.all(4),
+                      child: Icon(Icons.close, size: 16, color: Color(0xFF94A3B8)),
+                    ),
+                  ),
+                ],
+              ),
             ],
+          ),
+          const SizedBox(height: 16),
+
+          // 4-column responsive data row matching web screenshot
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final isWide = constraints.maxWidth >= 550;
+              if (isWide) {
+                return Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(flex: 3, child: _buildCustomerInfoCol("CUSTOMER NAME", customer.name)),
+                    const SizedBox(width: 8),
+                    Expanded(flex: 2, child: _buildCustomerInfoCol("PHONE", customer.mobile)),
+                    const SizedBox(width: 8),
+                    Expanded(flex: 3, child: _buildCustomerInfoCol("ADDRESS", addr)),
+                    const SizedBox(width: 8),
+                    Expanded(flex: 2, child: _buildCustomerInfoCol("CUSTOMER TYPE", cType)),
+                  ],
+                );
+              } else {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(flex: 3, child: _buildCustomerInfoCol("CUSTOMER NAME", customer.name)),
+                        const SizedBox(width: 12),
+                        Expanded(flex: 2, child: _buildCustomerInfoCol("PHONE", customer.mobile)),
+                      ],
+                    ),
+                    const SizedBox(height: 14),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(flex: 3, child: _buildCustomerInfoCol("ADDRESS", addr)),
+                        const SizedBox(width: 12),
+                        Expanded(flex: 2, child: _buildCustomerInfoCol("CUSTOMER TYPE", cType)),
+                      ],
+                    ),
+                  ],
+                );
+              }
+            },
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildCustomerInfoCol(String label, String value) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.bold,
+            color: Color(0xFF64748B),
+            letterSpacing: 0.3,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          value.trim().isEmpty ? "-" : value,
+          style: const TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w500,
+            color: Color(0xFF1E293B),
+          ),
+        ),
+      ],
     );
   }
 

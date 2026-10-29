@@ -3,7 +3,6 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:billingapp/utils/app_logger.dart';
 import 'package:billingapp/theme.dart';
 
@@ -58,37 +57,38 @@ class _CreatePurchaseOrderPageState extends State<CreatePurchaseOrderPage> with 
   @override
   Widget build(BuildContext context) {
     final double screenWidth = MediaQuery.of(context).size.width;
-    final bool isMobile = screenWidth < 700;
+    final bool isMobile = screenWidth < 750;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF3F4F6),
+      backgroundColor: const Color(0xFFF8FAFC),
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(16),
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
           child: Form(
             key: _formKey,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // 1. Navigation header
+                // 1. Navigation Header & Products Selected badge
                 _buildTopNavigation(),
-                const SizedBox(height: 20),
+                const SizedBox(height: 16),
 
-                // 2. Form details
-                _buildBasicDetailsCard(isMobile),
-                const SizedBox(height: 20),
+                // 2. 1. Select Supplier *
+                _buildSupplierSection(),
+                const SizedBox(height: 16),
 
-                // 3. Items section
-                _buildItemsSection(isMobile),
-                const SizedBox(height: 20),
+                // 3. 2. Available Product Catalog
+                _buildCatalogSection(isMobile),
+                const SizedBox(height: 16),
 
-                // 4. Notes & Summary section
-                _buildSummarySection(isMobile),
+                // 4. 3. Selected Products for Reorder
+                _buildSelectedProductsSection(),
+                const SizedBox(height: 16),
+
+                // 5. Additional Instructions & Schedule + 5. ORDER SUMMARY
+                _buildSummaryAndScheduleSection(isMobile),
                 const SizedBox(height: 32),
-
-                // 5. Save/Cancel Actions
-                _buildActionButtons(),
-                const SizedBox(height: 20),
               ],
             ),
           ),

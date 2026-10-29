@@ -122,16 +122,18 @@ mixin ProductAllocationLogic on State<ProductAllocationPage> {
 
               final categories = group['Categories'];
               if (categories != null && categories is Map) {
-                void processList(dynamic pListRaw, dynamic catId) {
+                void processList(dynamic pListRaw, dynamic catId, {String? brandName, String? catName}) {
                   if (pListRaw is! List) return;
                   for (var product in pListRaw) {
                     if (product is! Map) continue;
                     finalList.add({
-                      "id": product['allocation_id'] ?? product['id'],
-                      "category_group_id": group['CategoryGroupId'],
-                      "category_id": catId,
-                      "brand_id": product['brand_id'],
-                      "product_id": product['product_id'] ?? product['id'],
+                      "id": int.tryParse((product['allocation_id'] ?? product['id'])?.toString() ?? "") ?? 0,
+                      "category_group_id": int.tryParse(group['CategoryGroupId']?.toString() ?? ""),
+                      "category_id": int.tryParse(catId?.toString() ?? ""),
+                      "category_name": catName ?? product['category_name'],
+                      "brand_id": int.tryParse(product['brand_id']?.toString() ?? ""),
+                      "brand_name": brandName ?? product['brand_name'],
+                      "product_id": int.tryParse((product['product_id'] ?? product['id'])?.toString() ?? ""),
                       "name": product['product_name'] ?? product['name'] ?? "No Name",
                       "code": product['product_code'] ?? product['code'] ?? product['extra_product_code'] ?? "-",
                       "min": product['min_qty'] ?? product['Qty']?['min'] ?? 0,
@@ -148,7 +150,12 @@ mixin ProductAllocationLogic on State<ProductAllocationPage> {
                   if (primary is! Map) continue;
                   for (var brand in (primary['Brand'] ?? [])) {
                     if (brand is! Map) continue;
-                    processList(brand['Products'] ?? [], primary['id']);
+                    processList(
+                      brand['Products'] ?? [],
+                      primary['id'],
+                      brandName: brand['name']?.toString(),
+                      catName: primary['name']?.toString(),
+                    );
                   }
                 }
 
@@ -156,17 +163,24 @@ mixin ProductAllocationLogic on State<ProductAllocationPage> {
                   if (secondary is! Map) continue;
                   for (var brand in (secondary['Brand'] ?? [])) {
                     if (brand is! Map) continue;
-                    processList(brand['Products'] ?? [], secondary['id']);
+                    processList(
+                      brand['Products'] ?? [],
+                      secondary['id'],
+                      brandName: brand['name']?.toString(),
+                      catName: secondary['name']?.toString(),
+                    );
                   }
                 }
               } else {
                 // Direct flat product item in list (as in Web)
                 finalList.add({
-                  "id": group['allocation_id'] ?? group['id'],
-                  "category_group_id": group['CategoryGroupId'] ?? group['category_group_id'],
-                  "category_id": group['category_id'] ?? group['secondary_category_id'] ?? group['primary_category_id'],
-                  "brand_id": group['brand_id'],
-                  "product_id": group['product_id'] ?? group['id'],
+                  "id": int.tryParse((group['allocation_id'] ?? group['id'])?.toString() ?? "") ?? 0,
+                  "category_group_id": int.tryParse((group['CategoryGroupId'] ?? group['category_group_id'])?.toString() ?? ""),
+                  "category_id": int.tryParse((group['category_id'] ?? group['secondary_category_id'] ?? group['primary_category_id'])?.toString() ?? ""),
+                  "category_name": group['primary_category_name'] ?? group['secondary_category_name'] ?? group['category_name'],
+                  "brand_id": int.tryParse(group['brand_id']?.toString() ?? ""),
+                  "brand_name": group['brand_name'],
+                  "product_id": int.tryParse((group['product_id'] ?? group['id'])?.toString() ?? ""),
                   "name": group['product_name'] ?? group['name'] ?? "No Name",
                   "code": group['product_code'] ?? group['code'] ?? group['extra_product_code'] ?? "-",
                   "min": group['min_qty'] ?? group['Qty']?['min'] ?? group['min'] ?? 0,

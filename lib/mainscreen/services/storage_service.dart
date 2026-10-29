@@ -9,6 +9,10 @@ class StorageService {
   static Future<StorageService> getInstance() async {
     _instance ??= StorageService._();
     _prefs ??= await SharedPreferences.getInstance();
+    if (_prefs?.getBool(keyThemeInitialized) != true) {
+      await _prefs?.setBool(keyIsDarkMode, false);
+      await _prefs?.setBool(keyThemeInitialized, true);
+    }
     return _instance!;
   }
 
@@ -27,6 +31,7 @@ class StorageService {
 
   // --- Settings Keys & Values ---
   static const String keyIsDarkMode = 'is_dark_mode';
+  static const String keyThemeInitialized = 'theme_default_light_set_v1';
   static const String keyNotificationsEnabled = 'notifications_enabled';
   static const String keyLanguage = 'language';
   static const String keyAutoSync = 'auto_sync';
@@ -84,7 +89,7 @@ class StorageService {
   Future<bool> setUserId(String value) async => await _prefs?.setString(keyUserId, value) ?? false;
 
   // Settings Toggles
-  bool get isDarkMode => _prefs?.getBool(keyIsDarkMode) ?? true; // Default to beautiful dark mode
+  bool get isDarkMode => _prefs?.getBool(keyIsDarkMode) ?? false; // Default to Light Mode
   Future<bool> setDarkMode(bool value) async => await _prefs?.setBool(keyIsDarkMode, value) ?? false;
 
   bool get notificationsEnabled => _prefs?.getBool(keyNotificationsEnabled) ?? true;

@@ -468,7 +468,7 @@ extension _ProductEntryPageStateWidgets on _ProductEntryPageState {
                             separatorBuilder: (_, index) => Divider(height: 1, color: Colors.grey.shade100),
                             itemBuilder: (context, index) {
                               final cat = filtered[index];
-                              final int cId = cat['id'] as int;
+                              final int cId = int.tryParse(cat['id']?.toString() ?? "") ?? 0;
                               final String cName = cat['name']?.toString() ?? "No Name";
                               final String cCode = cat['code']?.toString() ?? "";
                               final bool isPrimary = cat['is_primary'] == true;
@@ -701,9 +701,10 @@ extension _ProductEntryPageStateWidgets on _ProductEntryPageState {
         LayoutBuilder(
           builder: (context, constraints) {
             final selectedCatObj = (selectedCategoryId != null)
-                ? categoryItems.firstWhere((e) => e['id'] == selectedCategoryId, orElse: () => {})
+                ? categoryItems.firstWhere((e) => e['id']?.toString() == selectedCategoryId?.toString(), orElse: () => {})
                 : null;
-            final selectedCatName = selectedCatObj?['name']?.toString();
+            final selectedCatName = selectedCatObj?['name']?.toString() ??
+                (widget.editItem?['category_name'] ?? widget.editItem?['raw']?['primary_category_name'])?.toString();
 
             final categoryField = Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -803,8 +804,9 @@ extension _ProductEntryPageStateWidgets on _ProductEntryPageState {
                 ),
                 icon: const Icon(Icons.keyboard_arrow_down, color: Colors.grey),
                 items: brands.map((e) {
+                  final bId = int.tryParse(e['id']?.toString() ?? "") ?? 0;
                   return DropdownMenuItem<int>(
-                    value: e['id'] as int,
+                    value: bId,
                     child: Text(
                       e['name']?.toString() ?? "No Name",
                       style: GoogleFonts.inter(fontSize: 13),
@@ -852,8 +854,9 @@ extension _ProductEntryPageStateWidgets on _ProductEntryPageState {
                     ),
                     icon: const Icon(Icons.keyboard_arrow_down, color: Colors.grey),
                     items: products.map((e) {
+                      final pId = int.tryParse(e['id']?.toString() ?? "") ?? 0;
                       return DropdownMenuItem<int>(
-                        value: e['id'] as int,
+                        value: pId,
                         child: Text(
                           e['product_name']?.toString() ?? e['name']?.toString() ?? "No Product",
                           style: GoogleFonts.inter(fontSize: 13),

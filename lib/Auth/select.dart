@@ -97,6 +97,14 @@ class _BusinessSelectionPageState extends State<BusinessSelectionPage> {
       await prefs.setString("business_type", businessType.toString());
       await prefs.setString("business_status", status.toString());
 
+      // Clear previous platform and store selections for fresh state
+      await prefs.remove("selected_platform_id");
+      await prefs.remove("platform_id");
+      await prefs.remove("selected_store_id");
+      await prefs.remove("store_id");
+      await prefs.remove("store_name");
+      await prefs.remove("selected_store_name");
+
       // Pre-fetch permissions & notifications in background
       ApiService.getUserPermissions().ignore();
       ApiService.getNotifications().ignore();
@@ -417,6 +425,12 @@ class _PlatformSelectionPageState extends State<PlatformSelectionPage> {
     await prefs.setString("platform_id", finalPlatformId);
     await prefs.setString("platform_name", finalPlatformName);
 
+    // Clear previous store selection for fresh platform choice
+    await prefs.remove("selected_store_id");
+    await prefs.remove("store_id");
+    await prefs.remove("store_name");
+    await prefs.remove("selected_store_name");
+
     if (!mounted) return;
 
     Navigator.push(
@@ -726,6 +740,7 @@ class _StoreSelectionPageState extends State<StoreSelectionPage> {
         await prefs.setString("selected_store_id", storeId);
         await prefs.setString("store_id", storeId);
         await prefs.setString("store_name", storeName);
+        await prefs.setString("selected_store_name", storeName);
         await prefs.setString("store_address", address);
         await prefs.setString("store_phone", phone);
         await prefs.setString("store_branch_type", branchType);
@@ -734,15 +749,18 @@ class _StoreSelectionPageState extends State<StoreSelectionPage> {
         await prefs.setString("selected_store_id", "1");
         await prefs.setString("store_id", "1");
         await prefs.setString("store_name", widget.businessName);
+        await prefs.setString("selected_store_name", widget.businessName);
       }
 
-      // Pre-warm bills API in background
-      ApiService.getSalesBills().ignore();
+      // Pre-warm bills API in background with selected IDs
+      final pId = prefs.getString("selected_platform_id") ?? "1";
+      final sId = prefs.getString("selected_store_id") ?? "1";
+      ApiService.getSalesBills(businessId: widget.businessId, platformId: pId, storeId: sId).ignore();
 
-      // Refresh DashboardController if registered
+      // Reset DashboardController so DashboardUI creates a fresh instance with the selected business & store
       if (Get.isRegistered<DashboardController>()) {
         try {
-          Get.find<DashboardController>().loadBusiness();
+          Get.delete<DashboardController>(force: true);
         } catch (_) {}
       }
 

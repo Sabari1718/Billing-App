@@ -206,80 +206,164 @@ extension _ProductEntryPageStateLogic on _ProductEntryPageState {
   Future<void> _initializeEditCategoryBrand() async {
     if (editCategoryId == null) return;
 
-    bool isPrimary = categoryItems.any((c) => c['id'] == editCategoryId);
-    if (isPrimary) {
-      selectedCategoryId = editCategoryId;
-      selectedSecondaryCategoryId = null;
+    // Check if category exists in categoryItems
+    final matchedCat = categoryItems.firstWhere(
+      (c) => c['id']?.toString() == editCategoryId.toString(),
+      orElse: () => {},
+    );
 
-      final matchedItem = categoryItems.firstWhere(
-        (c) => c['id'] == editCategoryId,
-        orElse: () => {},
-      );
+    if (matchedCat.isNotEmpty) {
+      bool isPrimary = matchedCat['is_primary'] == true || matchedCat['type'] == 'primary';
+      if (isPrimary) {
+        selectedCategoryId = int.tryParse(matchedCat['id']?.toString() ?? "") ?? editCategoryId;
+        selectedSecondaryCategoryId = null;
 
-      final rawSec = matchedItem['secondaryCategories'] ?? matchedItem['secondary_categories'] ?? [];
-      secondaryCategories = List<Map<String, dynamic>>.from(rawSec);
+        final rawSec = matchedCat['secondaryCategories'] ?? matchedCat['secondary_categories'] ?? [];
+        secondaryCategories = List<Map<String, dynamic>>.from(rawSec);
 
-      if (secondaryCategories.isEmpty || !hasSecondaryCategories) {
-        final brandList = matchedItem['brands'] ?? [];
-        final Map<int, Map<String, dynamic>> uniqueBrands = {};
-        for (var brand in brandList) {
-          if (brand['id'] != null) {
-            uniqueBrands[brand['id']] = {
-              "id": brand['id'],
-              "name": brand['name'] ?? "No Name",
-            };
-          }
-        }
-        brands = uniqueBrands.values.toList();
-      }
-    } else {
-      int? parentPrimaryId;
-      Map<String, dynamic>? matchedSec;
-      List<Map<String, dynamic>> parentSecList = [];
-
-      for (var cat in categoryItems) {
-        final rawSec = cat['secondaryCategories'] ?? cat['secondary_categories'] ?? [];
-        if (rawSec is List) {
-          for (var sec in rawSec) {
-            if (sec['id'] == editCategoryId) {
-              parentPrimaryId = cat['id'];
-              matchedSec = Map<String, dynamic>.from(sec);
-              parentSecList = List<Map<String, dynamic>>.from(rawSec);
-              break;
+        if (secondaryCategories.isEmpty || !hasSecondaryCategories) {
+          final brandList = matchedCat['brands'] ?? [];
+          final Map<int, Map<String, dynamic>> uniqueBrands = {};
+          for (var brand in brandList) {
+            if (brand != null && brand['id'] != null) {
+              final bId = int.tryParse(brand['id'].toString()) ?? 0;
+              if (bId != 0) {
+                uniqueBrands[bId] = {
+                  "id": bId,
+                  "name": brand['name'] ?? "No Name",
+                };
+              }
             }
           }
+          brands = uniqueBrands.values.toList();
         }
-        if (parentPrimaryId != null) break;
+      } else {
+        int? parentPrimaryId;
+        Map<String, dynamic>? matchedSec;
+        List<Map<String, dynamic>> parentSecList = [];
+
+        for (var cat in categoryItems) {
+          final rawSec = cat['secondaryCategories'] ?? cat['secondary_categories'] ?? [];
+          if (rawSec is List) {
+            for (var sec in rawSec) {
+              if (sec['id']?.toString() == editCategoryId.toString()) {
+                parentPrimaryId = int.tryParse(cat['id']?.toString() ?? "");
+                matchedSec = Map<String, dynamic>.from(sec);
+                parentSecList = List<Map<String, dynamic>>.from(rawSec);
+                break;
+              }
+            }
+          }
+          if (parentPrimaryId != null) break;
+        }
+
+        if (parentPrimaryId != null && matchedSec != null) {
+          selectedCategoryId = parentPrimaryId;
+          selectedSecondaryCategoryId = editCategoryId;
+          secondaryCategories = parentSecList;
+
+          final brandList = matchedSec['brands'] ?? [];
+          final Map<int, Map<String, dynamic>> uniqueBrands = {};
+          for (var brand in brandList) {
+            if (brand != null && brand['id'] != null) {
+              final bId = int.tryParse(brand['id'].toString()) ?? 0;
+              if (bId != 0) {
+                uniqueBrands[bId] = {
+                  "id": bId,
+                  "name": brand['name'] ?? "No Name",
+                };
+              }
+            }
+          }
+          brands = uniqueBrands.values.toList();
+        } else {
+          selectedCategoryId = editCategoryId;
+        }
       }
+    } else {
+      // Category not in list, add it to categoryItems so it can be selected and displayed
+      final catName = widget.editItem?['category_name'] ??
+          widget.editItem?['raw']?['primary_category_name'] ??
+          "Category #$editCategoryId";
+      final catObj = {
+        "id": editCategoryId!,
+        "name": catName.toString(),
+        "code": "",
+        "type": "primary",
+        "is_primary": true,
+        "parent_id": null,
+        "parent_name": "",
+        "image_url": "",
+        "brands": [],
+      };
+      categoryItems.insert(0, catObj);
+      selectedCategoryId = editCategoryId;
+    }
 
-      if (parentPrimaryId != null && matchedSec != null) {
-        selectedCategoryId = parentPrimaryId;
-        selectedSecondaryCategoryId = editCategoryId;
-        secondaryCategories = parentSecList;
-
-        final brandList = matchedSec['brands'] ?? [];
-        final Map<int, Map<String, dynamic>> uniqueBrands = {};
-        for (var brand in brandList) {
-          if (brand['id'] != null) {
-            uniqueBrands[brand['id']] = {
-              "id": brand['id'],
-              "name": brand['name'] ?? "No Name",
-            };
+    // If brands are still empty, fetch them for this category from API
+    if (brands.isEmpty) {
+      try {
+        final targetCatId = selectedSecondaryCategoryId ?? selectedCategoryId ?? editCategoryId!;
+        final brandRes = await ApiService.getBrandsByCategory(categoryId: targetCatId);
+        final rawBrands = brandRes['data'];
+        if (rawBrands is List && rawBrands.isNotEmpty) {
+          final List<Map<String, dynamic>> parsedBrands = [];
+          for (var b in rawBrands) {
+            if (b != null && b['id'] != null) {
+              final bId = int.tryParse(b['id'].toString()) ?? 0;
+              if (bId != 0) {
+                parsedBrands.add({
+                  "id": bId,
+                  "name": b['name']?.toString() ?? "No Name",
+                  "code": b['code']?.toString() ?? "",
+                  "image": b['image']?.toString() ?? "",
+                });
+              }
+            }
+          }
+          if (parsedBrands.isNotEmpty) {
+            brands = parsedBrands;
           }
         }
-        brands = uniqueBrands.values.toList();
-      } else {
-        selectedCategoryId = editCategoryId;
+      } catch (e) {
+        debugPrint("Error fetching brands in edit mode: $e");
       }
     }
 
     if (editBrandId != null) {
       selectedBrandId = editBrandId;
+
+      // Ensure the brand exists in brands list so dropdown selects it
+      if (!brands.any((b) => b['id'] == editBrandId)) {
+        final bName = widget.editItem?['brand_name'] ??
+            widget.editItem?['raw']?['brand_name'] ??
+            "Brand #$editBrandId";
+        brands.insert(0, {
+          "id": editBrandId!,
+          "name": bName.toString(),
+          "code": "",
+          "image": "",
+        });
+      }
+
       await loadProducts(selectedSecondaryCategoryId ?? selectedCategoryId!, editBrandId!);
       if (mounted) {
         setState(() {
-          selectedProductId = widget.editItem?['product_id'];
-          selectedProductName = widget.editItem?['name'];
+          selectedProductId = int.tryParse(widget.editItem?['product_id']?.toString() ?? "");
+          selectedProductName = widget.editItem?['name']?.toString();
+          selectedProductMrp = widget.editItem?['mrp']?.toString();
+          selectedProductCode = widget.editItem?['code']?.toString();
+
+          if (selectedProductId != null && selectedProductName != null) {
+            if (!products.any((p) => p['id'] == selectedProductId)) {
+              products.insert(0, {
+                "id": selectedProductId!,
+                "product_name": selectedProductName!,
+                "code": selectedProductCode ?? "",
+                "mrp": selectedProductMrp ?? "0.00",
+              });
+            }
+          }
         });
       }
     }
@@ -664,14 +748,26 @@ extension _ProductEntryPageStateLogic on _ProductEntryPageState {
 
     final map = <int, Map<String, dynamic>>{};
     for (var p in extracted) {
-      map[p['id'] as int] = p;
+      final pId = int.tryParse(p['id']?.toString() ?? "") ?? 0;
+      if (pId != 0) {
+        map[pId] = p;
+      }
     }
     final finalVisibleProducts = map.values.toList();
 
     if (!mounted) return;
     setState(() {
       products = finalVisibleProducts;
-      if (selectedProductId != null && !finalVisibleProducts.any((p) => p['id'] == selectedProductId)) {
+      if (editAllocationId != null && selectedProductId != null && selectedProductName != null) {
+        if (!finalVisibleProducts.any((p) => p['id'] == selectedProductId)) {
+          finalVisibleProducts.insert(0, {
+            "id": selectedProductId!,
+            "product_name": selectedProductName!,
+            "code": selectedProductCode ?? "",
+            "mrp": selectedProductMrp ?? "0.00",
+          });
+        }
+      } else if (selectedProductId != null && !finalVisibleProducts.any((p) => p['id'] == selectedProductId)) {
         selectedProductId = null;
         selectedProductName = null;
         selectedProductMrp = null;
@@ -712,22 +808,22 @@ extension _ProductEntryPageStateLogic on _ProductEntryPageState {
 
       for (var group in categoryGroups) {
         // Load the category brands for this group
-        final res = await ApiService.getCategoryBrands(categoryGroupId: group.id!);
+        final res = await ApiService.getCategoryBrands(categoryGroupId: group.id);
         final groupData = res['data'] ?? [];
         
         bool found = false;
         for (var mapping in mappings) {
-          final targetCategoryId = mapping["category_id"] as int?;
+          final targetCategoryId = int.tryParse(mapping["category_id"]?.toString() ?? "");
           if (targetCategoryId == null) continue;
 
           for (var g in groupData) {
             for (var primary in (g['primary_categories'] ?? [])) {
-              if (primary['id'] == targetCategoryId) {
+              if (primary['id']?.toString() == targetCategoryId.toString()) {
                 found = true;
                 break;
               }
               for (var secondary in (primary['secondary_categories'] ?? [])) {
-                if (secondary['id'] == targetCategoryId) {
+                if (secondary['id']?.toString() == targetCategoryId.toString()) {
                   found = true;
                   break;
                 }
@@ -752,9 +848,9 @@ extension _ProductEntryPageStateLogic on _ProductEntryPageState {
         throw Exception("No accessible category group found for this product.");
       }
 
-      final targetCategoryId = selectedMapping["category_id"] as int?;
-      final targetBrandId = selectedMapping["brand_id"] as int?;
-      final targetProductId = data["id"] as int?;
+      final targetCategoryId = int.tryParse(selectedMapping["category_id"]?.toString() ?? "");
+      final targetBrandId = int.tryParse(selectedMapping["brand_id"]?.toString() ?? "");
+      final targetProductId = int.tryParse(data["id"]?.toString() ?? "");
 
       if (targetCategoryId == null || targetBrandId == null || targetProductId == null) {
         throw Exception("Invalid mapping configuration in product details");
@@ -768,7 +864,7 @@ extension _ProductEntryPageStateLogic on _ProductEntryPageState {
       });
       
       // Load categories under this group
-      await loadCategoryBrandData(matchedGroupId!);
+      await loadCategoryBrandData(matchedGroupId);
       if (!mounted) return;
 
       // Select targetCategoryId as primary or secondary category
@@ -975,9 +1071,9 @@ extension _ProductEntryPageStateLogic on _ProductEntryPageState {
       setState(() => isLoading = true);
       final success = await ApiService.updateProductAllocation(
         id: editAllocationId!,
-        categoryGroupId: editCategoryGroupId ?? 0,
-        categoryId: editCategoryId ?? 0,
-        brandId: editBrandId ?? 0,
+        categoryGroupId: selectedCategoryGroupId ?? editCategoryGroupId ?? 0,
+        categoryId: selectedSecondaryCategoryId ?? selectedCategoryId ?? editCategoryId ?? 0,
+        brandId: selectedBrandId ?? editBrandId ?? 0,
         productName: selectedProductName!,
         minQty: int.tryParse(minQtyController.text) ?? 0,
         maxQty: int.tryParse(maxQtyController.text) ?? 0,

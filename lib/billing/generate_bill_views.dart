@@ -5,130 +5,218 @@ extension _CustomerScreenStateViews on _CustomerScreenState {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text("Customer Type", style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.black87)),
-        const SizedBox(height: 12),
+        // Main Customer Selection Card (Photo 4)
         Container(
-          padding: const EdgeInsets.all(4),
+          width: double.infinity,
           decoration: BoxDecoration(
-            color: Colors.grey.shade100,
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Row(
-            children: [
-              _buildSubTabButton("User", isUser, () {
-                setState(() {
-                  isUser = true;
-                  selectedCustomer = null;
-                  results = [];
-                  _showDropdown = false;
-                  _searchController.clear();
-                });
-              }),
-              const SizedBox(width: 4),
-              _buildSubTabButton("Business", !isUser, () {
-                setState(() {
-                  isUser = false;
-                  selectedCustomer = null;
-                  results = [];
-                  _showDropdown = false;
-                  _searchController.clear();
-                });
-              }),
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: Colors.grey.shade200),
+            boxShadow: [
+              BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 4, offset: const Offset(0, 2)),
             ],
           ),
-        ),
-
-        const SizedBox(height: 24),
-
-        CompositedTransformTarget(
-          link: _layerLink,
+          padding: const EdgeInsets.all(16),
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              // Header Row: | Customer Selection   [+ Unregistered Customer]  [+ Add New Customer]
+              Wrap(
+                alignment: WrapAlignment.spaceBetween,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                spacing: 12,
+                runSpacing: 10,
                 children: [
-                  if (!isUser) ...[
-                    Container(
-                      height: 52,
-                      padding: const EdgeInsets.symmetric(horizontal: 12),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        border: Border.all(color: Colors.grey.shade200),
-                        borderRadius: BorderRadius.circular(12),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 3,
+                        height: 18,
+                        color: const Color(0xFF0D6EFD),
                       ),
-                      child: DropdownButtonHideUnderline(
-                        child: DropdownButton<String>(
-                          value: verifyBy,
-                          icon: const Icon(Icons.keyboard_arrow_down, size: 18),
-                          items: ["Mobile No", "GST No", "PAN No"]
-                              .map((e) => DropdownMenuItem(value: e, child: Text(e, style: const TextStyle(fontSize: 13))))
-                              .toList(),
-                          onChanged: (v) {
-                            if (v != null) {
-                              setState(() {
-                                verifyBy = v;
-                                results = [];
-                                selectedCustomer = null;
-                                _showDropdown = false;
-                                _searchController.clear();
-                              });
-                            }
-                          },
+                      const SizedBox(width: 8),
+                      const Text(
+                        "Customer Selection",
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF1E293B),
                         ),
                       ),
-                    ),
-                    const SizedBox(width: 10),
-                  ],
-                  Expanded(
-                    child: TextField(
-                      controller: _searchController,
-                      focusNode: _searchFocusNode,
-                      keyboardType: verifyBy == "Mobile No" ? TextInputType.phone : TextInputType.text,
-                      onChanged: searchCustomer,
-                      style: const TextStyle(fontSize: 15),
-                      decoration: InputDecoration(
-                        hintText: "Enter $verifyBy",
-                        hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 14),
-                        prefixIcon: Icon(verifyBy == "Mobile No" ? Icons.phone_android : Icons.assignment_ind, size: 18, color: Colors.grey),
-                        contentPadding: const EdgeInsets.symmetric(vertical: 16),
-                        suffixIcon: loading 
-                          ? const Padding(
-                              padding: EdgeInsets.all(14),
-                              child: SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
-                            )
-                          : _searchController.text.isNotEmpty 
-                            ? IconButton(
-                                icon: const Icon(Icons.cancel, color: Colors.grey, size: 20),
-                                onPressed: () {
-                                  setState(() {
-                                    _searchController.clear();
-                                    results = [];
-                                    selectedCustomer = null;
-                                    _showDropdown = false;
-                                    loading = false;
-                                    errorMessage = null;
-                                  });
-                                }
-                              )
-                            : null,
+                    ],
+                  ),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 6,
+                    children: [
+                      OutlinedButton.icon(
+                        onPressed: _showUnregisteredCustomerDialog,
+                        icon: const Icon(Icons.add, size: 14),
+                        label: const Text(
+                          "Unregistered Customer",
+                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: const Color(0xFFEA580C),
+                          side: const BorderSide(color: Color(0xFFEA580C)),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                        ),
                       ),
-                    ),
+                      OutlinedButton.icon(
+                        onPressed: _launchCustomerRegistration,
+                        icon: const Icon(Icons.person_add_alt_1_outlined, size: 14),
+                        label: const Text(
+                          "Add New Customer",
+                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: const Color(0xFF10B981),
+                          side: const BorderSide(color: Color(0xFF10B981)),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
-              
-              if (_showDropdown && (results.isNotEmpty || errorMessage != null))
-                _buildAutocompleteDropdown(),
+              const SizedBox(height: 16),
+
+              // Filter row: Customer Type [User] [Business]   Mobile No [Enter Mobile]
+              Wrap(
+                spacing: 16,
+                runSpacing: 12,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Text(
+                        "Customer Type",
+                        style: TextStyle(fontSize: 12, color: Color(0xFF64748B), fontWeight: FontWeight.w500),
+                      ),
+                      const SizedBox(width: 8),
+                      Container(
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF1F5F9),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(color: Colors.grey.shade300),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            InkWell(
+                              onTap: () {
+                                setState(() {
+                                  isUser = true;
+                                  verifyBy = "Mobile No";
+                                  results = [];
+                                  _showDropdown = false;
+                                  _searchController.clear();
+                                });
+                              },
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+                                decoration: BoxDecoration(
+                                  color: isUser ? const Color(0xFF0D6EFD) : Colors.transparent,
+                                  borderRadius: BorderRadius.circular(5),
+                                ),
+                                child: Text(
+                                  "User",
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                    color: isUser ? Colors.white : const Color(0xFF475569),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            InkWell(
+                              onTap: () {
+                                setState(() {
+                                  isUser = false;
+                                  results = [];
+                                  _showDropdown = false;
+                                  _searchController.clear();
+                                });
+                              },
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+                                decoration: BoxDecoration(
+                                  color: !isUser ? const Color(0xFF0D6EFD) : Colors.transparent,
+                                  borderRadius: BorderRadius.circular(5),
+                                ),
+                                child: Text(
+                                  "Business",
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                    color: !isUser ? Colors.white : const Color(0xFF475569),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        verifyBy == "Mobile No" ? "Mobile No" : verifyBy,
+                        style: const TextStyle(fontSize: 12, color: Color(0xFF64748B), fontWeight: FontWeight.w500),
+                      ),
+                      const SizedBox(width: 8),
+                      SizedBox(
+                        width: 220,
+                        height: 38,
+                        child: TextField(
+                          controller: _searchController,
+                          focusNode: _searchFocusNode,
+                          keyboardType: TextInputType.phone,
+                          onChanged: searchCustomer,
+                          style: const TextStyle(fontSize: 12),
+                          decoration: InputDecoration(
+                            hintText: "Enter Mobile",
+                            hintStyle: TextStyle(fontSize: 12, color: Colors.grey.shade400),
+                            prefixIcon: const Icon(Icons.search, size: 16, color: Color(0xFF94A3B8)),
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(6),
+                              borderSide: BorderSide(color: Colors.grey.shade300),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(6),
+                              borderSide: BorderSide(color: Colors.grey.shade300),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(6),
+                              borderSide: const BorderSide(color: Color(0xFF0D6EFD)),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ],
           ),
         ),
 
         const SizedBox(height: 16),
 
+        // If dropdown is open (searching)
+        if (_showDropdown && (results.isNotEmpty || errorMessage != null || loading))
+          _buildAutocompleteDropdown(),
+
+        // If customer is selected or unregistered customer exists
         if (selectedCustomer != null) ...[
           _buildSelectedCustomerCompact(selectedCustomer!),
-        ] else ...[
-          _buildAddNewCustomerButton(),
         ],
       ],
     );
@@ -138,114 +226,286 @@ extension _CustomerScreenStateViews on _CustomerScreenState {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            const Text("Product Search", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black)),
-            TextButton.icon(
-              onPressed: () => _showAdvancedProductSearch(),
-              icon: const Icon(Icons.tune, size: 18, color: Color(0xFF2563EB)),
-              label: const Text("Advanced Search", style: TextStyle(color: Color(0xFF1F366A), fontSize: 13, fontWeight: FontWeight.w600)),
-            ),
-          ],
-        ),
-        const SizedBox(height: 16),
-        CompositedTransformTarget(
-          link: _productLayerLink,
+        // Product Search Card (Photo 1)
+        Container(
+          width: double.infinity,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: Colors.grey.shade200),
+            boxShadow: [
+              BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 4, offset: const Offset(0, 2)),
+            ],
+          ),
+          padding: const EdgeInsets.all(16),
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // Header: | Product Search   [ Advanced Search ]
               Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Container(
-                    height: 52,
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      border: Border.all(color: Colors.grey.shade200),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: DropdownButtonHideUnderline(
-                      child: DropdownButton<String>(
-                        value: productSearchBy,
-                        icon: const Icon(Icons.keyboard_arrow_down, size: 18),
-                        items: ["Name", "SKU", "Category"]
-                            .map((e) => DropdownMenuItem(value: e, child: Text(e, style: const TextStyle(fontSize: 13))))
-                            .toList(),
-                        onChanged: (v) {
-                          if (v != null) setState(() => productSearchBy = v);
-                        },
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 3,
+                        height: 18,
+                        color: const Color(0xFF0D6EFD),
                       ),
-                    ),
+                      const SizedBox(width: 8),
+                      const Text(
+                        "Product Search",
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF1E293B),
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: TextField(
-                      controller: _productSearchController,
-                      onChanged: searchProduct,
-                      style: const TextStyle(fontSize: 15),
-                      decoration: InputDecoration(
-                        hintText: "Enter $productSearchBy",
-                        hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 14),
-                        prefixIcon: const Icon(Icons.search, size: 18, color: Colors.grey),
-                        contentPadding: const EdgeInsets.symmetric(vertical: 16),
-                        suffixIcon: productLoading 
-                          ? const Padding(
-                              padding: EdgeInsets.all(14),
-                              child: SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
-                            )
-                          : null,
-                      ),
+                  OutlinedButton(
+                    onPressed: _showAdvancedProductSearch,
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: const Color(0xFF0D6EFD),
+                      side: const BorderSide(color: Color(0xFF0D6EFD)),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                     ),
+                    child: const Text("Advanced Search", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+
+              // Inputs: Search By: [Product Name ▾]  Enter Value: [Filter by first letter (A-Z)]
+              Wrap(
+                spacing: 16,
+                runSpacing: 12,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Text("Search By:", style: TextStyle(fontSize: 12, color: Color(0xFF64748B), fontWeight: FontWeight.w500)),
+                      const SizedBox(width: 8),
+                      Container(
+                        height: 38,
+                        padding: const EdgeInsets.symmetric(horizontal: 10),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(color: Colors.grey.shade300),
+                        ),
+                        child: DropdownButtonHideUnderline(
+                          child: DropdownButton<String>(
+                            value: productSearchBy,
+                            icon: const Icon(Icons.keyboard_arrow_down, size: 18, color: Color(0xFF64748B)),
+                            items: ["Product Name", "Product Code", "Brand", "Category"]
+                                .map((e) => DropdownMenuItem(value: e, child: Text(e, style: const TextStyle(fontSize: 12, color: Color(0xFF1E293B)))))
+                                .toList(),
+                            onChanged: (v) {
+                              if (v != null) setState(() => productSearchBy = v);
+                            },
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Text("Enter Value:", style: TextStyle(fontSize: 12, color: Color(0xFF64748B), fontWeight: FontWeight.w500)),
+                      const SizedBox(width: 8),
+                      SizedBox(
+                        width: 220,
+                        height: 38,
+                        child: TextField(
+                          controller: _productSearchController,
+                          onChanged: searchProduct,
+                          style: const TextStyle(fontSize: 12),
+                          decoration: InputDecoration(
+                            hintText: "Filter by first letter (A-Z)",
+                            hintStyle: TextStyle(fontSize: 12, color: Colors.grey.shade400),
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(6),
+                              borderSide: BorderSide(color: Colors.grey.shade300),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(6),
+                              borderSide: BorderSide(color: Colors.grey.shade300),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(6),
+                              borderSide: const BorderSide(color: Color(0xFF0D6EFD)),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
             ],
           ),
         ),
-        const SizedBox(height: 20),
-        _buildProductResultsList(),
-        const SizedBox(height: 24),
-        _buildSelectedItemsList(),
-        if (selectedBillItems.isNotEmpty) ...[
-          const SizedBox(height: 24),
-          _buildAdditionalChargesSection(),
+
+        const SizedBox(height: 16),
+
+        if (isStocksInitialLoading) ...[
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.grey.shade200),
+            ),
+            child: Row(
+              children: const [
+                SizedBox(
+                  width: 14,
+                  height: 14,
+                  child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF0D6EFD)),
+                ),
+                SizedBox(width: 10),
+                Text("Loading stocks from server...", style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
         ],
+
+        // Live Product Results (if typing in Enter Value or searching)
+        if (productLoading) ...[
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(vertical: 24),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.grey.shade200),
+            ),
+            child: const Center(
+              child: SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF0D6EFD)),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+        ] else if (productResults.isNotEmpty) ...[
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.grey.shade200),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      "Found Products (${productResults.length}) - Tap to add to bill",
+                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF0D6EFD)),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close, size: 16, color: Color(0xFF94A3B8)),
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                      onPressed: () {
+                        setState(() {
+                          _productSearchController.clear();
+                          productResults.clear();
+                        });
+                      },
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                ...productResults.map((item) => _buildProductCard(item)),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+        ] else if (_productSearchController.text.trim().isNotEmpty && !productLoading) ...[
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.grey.shade200),
+            ),
+            child: Center(
+              child: Text(
+                "No products found for '${_productSearchController.text.trim()}'",
+                style: const TextStyle(fontSize: 13, color: Color(0xFF64748B)),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+        ],
+
+        // Selected Products / Empty State Card (Photo 1)
+        Container(
+          width: double.infinity,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: Colors.grey.shade200),
+            boxShadow: [
+              BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 4, offset: const Offset(0, 2)),
+            ],
+          ),
+          padding: const EdgeInsets.all(24),
+          child: selectedBillItems.isEmpty
+              ? _buildEmptyProductsCard()
+              : Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildSelectedItemsList(),
+                    const SizedBox(height: 20),
+                    _buildAdditionalChargesSection(),
+                  ],
+                ),
+        ),
       ],
     );
   }
 
-  Widget _buildProductResultsList() {
-    if (productResults.isEmpty && productErrorMessage == null) {
-      return const Center(
-        child: Padding(
-          padding: EdgeInsets.symmetric(vertical: 40),
-          child: Column(
-            children: [
-              Icon(Icons.inventory_2_outlined, size: 48, color: Colors.grey),
-              SizedBox(height: 12),
-              Text("No products to display. Search to find products.", style: TextStyle(color: Colors.grey)),
-            ],
-          ),
+  Widget _buildEmptyProductsCard() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 36),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: const [
+            Text(
+              "No Products Selected",
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF334155),
+              ),
+            ),
+            SizedBox(height: 6),
+            Text(
+              "Search and add products to create a bill.",
+              style: TextStyle(
+                fontSize: 12,
+                color: Color(0xFF64748B),
+              ),
+            ),
+          ],
         ),
-      );
-    }
-
-    if (productErrorMessage != null) {
-      return Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(color: Colors.red.shade50, borderRadius: BorderRadius.circular(8)),
-        child: Text(productErrorMessage!, style: TextStyle(color: Colors.red.shade700)),
-      );
-    }
-
-    return Column(
-      children: [
-        if (productResults.isNotEmpty) ...[
-          _buildGroupHeadline("PRODUCT RESULTS"),
-          ...productResults.map((item) => _buildProductCard(item)),
-          const SizedBox(height: 24),
-        ],
-      ],
+      ),
     );
   }
 
@@ -272,11 +532,14 @@ extension _CustomerScreenStateViews on _CustomerScreenState {
         return GestureDetector(
           onTap: () async {
             if (!isSelected) {
-              final stockTypes = await fetchStockDetails(item.stockId, item.variantId);
+              final stockTypes = item.stockTypes.isNotEmpty
+                  ? item.stockTypes
+                  : await fetchStockDetails(item.stockId, item.variantId);
               setState(() {
                 selectedBillItems.add(item.copyWith(stockTypes: stockTypes));
                 calculateTotals();
               });
+              addBillProductApi(item, 1);
             } else {
               setState(() {
                 selectedBillItems.removeWhere((e) => e.stockId == item.stockId && e.variantId == item.variantId);
@@ -328,14 +591,39 @@ extension _CustomerScreenStateViews on _CustomerScreenState {
   Widget _buildDesktopCard(ProductStock item) {
     return Row(
       children: [
+        if (item.baseImage.isNotEmpty) ...[
+          ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: Image.network(
+              item.baseImage,
+              width: 48,
+              height: 48,
+              fit: BoxFit.cover,
+              errorBuilder: (_, __, ___) => Container(
+                width: 48,
+                height: 48,
+                color: Colors.grey.shade100,
+                child: const Icon(Icons.inventory_2_outlined, size: 24, color: Colors.grey),
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+        ],
         Expanded(
           flex: 3,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(item.productName, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF1E293B))),
+              Text(item.productName, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF1E293B))),
               const SizedBox(height: 4),
-              Text("${item.supplierName} • ${item.category}", style: TextStyle(color: Colors.grey.shade500, fontSize: 12)),
+              Text(
+                [
+                  if (item.productCode.isNotEmpty) item.productCode,
+                  if (item.brand.isNotEmpty) item.brand,
+                  if (item.category.isNotEmpty) item.category,
+                ].join(" • "),
+                style: TextStyle(color: Colors.grey.shade500, fontSize: 12),
+              ),
             ],
           ),
         ),
@@ -345,8 +633,9 @@ extension _CustomerScreenStateViews on _CustomerScreenState {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text("Warranty: ${item.warranty}", style: const TextStyle(fontSize: 12)),
-              Text("Qty: ${item.qty}", style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+              if (item.warranty.isNotEmpty)
+                Text("Warranty: ${item.warranty}", style: const TextStyle(fontSize: 12)),
+              Text("Stock: ${item.qty}", style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF16A34A))),
             ],
           ),
         ),
@@ -355,12 +644,13 @@ extension _CustomerScreenStateViews on _CustomerScreenState {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              Text("₹${item.unitPrice.toStringAsFixed(2)}", style: const TextStyle(fontSize: 14)),
-              Text("₹${item.total.toStringAsFixed(2)}", style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF2563EB))),
+              Text("₹${item.unitPrice.toStringAsFixed(2)}", style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF2563EB))),
+              if (item.mrp > item.unitPrice)
+                Text("MRP ₹${item.mrp.toStringAsFixed(2)}", style: TextStyle(fontSize: 11, color: Colors.grey.shade400, decoration: TextDecoration.lineThrough)),
             ],
           ),
         ),
-        const SizedBox(width: 24),
+        const SizedBox(width: 16),
         _buildActionButtons(item),
       ],
     );
@@ -371,29 +661,70 @@ extension _CustomerScreenStateViews on _CustomerScreenState {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Expanded(child: Text(item.productName, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold))),
+            if (item.baseImage.isNotEmpty) ...[
+              ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: Image.network(
+                  item.baseImage,
+                  width: 44,
+                  height: 44,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) => Container(
+                    width: 44,
+                    height: 44,
+                    color: Colors.grey.shade100,
+                    child: const Icon(Icons.inventory_2_outlined, size: 22, color: Colors.grey),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+            ],
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(item.productName, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF1E293B))),
+                  if (item.productCode.isNotEmpty || item.brand.isNotEmpty) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      [
+                        if (item.productCode.isNotEmpty) item.productCode,
+                        if (item.brand.isNotEmpty) item.brand,
+                      ].join(" • "),
+                      style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
             _variantBadge(item),
           ],
         ),
-        const SizedBox(height: 8),
-        Row(
+        const SizedBox(height: 10),
+        Wrap(
+          spacing: 8,
+          runSpacing: 4,
           children: [
-            _mobileInfoChip(Icons.verified_user_outlined, item.warranty, Colors.green),
-            const SizedBox(width: 12),
-            _mobileInfoChip(Icons.inventory_2_outlined, "Qty: ${item.qty}", Colors.orange),
+            if (item.category.isNotEmpty)
+              _mobileInfoChip(Icons.category_outlined, item.category, const Color(0xFF0D6EFD)),
+            if (item.warranty.isNotEmpty)
+              _mobileInfoChip(Icons.verified_user_outlined, item.warranty, Colors.green),
+            _mobileInfoChip(Icons.inventory_2_outlined, "Stock: ${item.qty}", const Color(0xFF16A34A)),
           ],
         ),
-        const Divider(height: 24),
+        const Divider(height: 20),
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text("Price: ₹${item.unitPrice.toStringAsFixed(2)}", style: TextStyle(color: Colors.grey.shade600, fontSize: 12)),
-                Text("Total: ₹${item.total.toStringAsFixed(2)}", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Color(0xFF2563EB))),
+                Text("₹${item.unitPrice.toStringAsFixed(2)}", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFF2563EB))),
+                if (item.mrp > item.unitPrice)
+                  Text("MRP ₹${item.mrp.toStringAsFixed(2)}", style: TextStyle(fontSize: 11, color: Colors.grey.shade400, decoration: TextDecoration.lineThrough)),
               ],
             ),
             _buildActionButtons(item),

@@ -91,9 +91,10 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ValueListenableBuilder<ThemeMode>(
-      valueListenable: themeNotifier,
-      builder: (_, ThemeMode currentMode, __) {
+    return provider_pkg.Consumer<ThemeProvider>(
+      builder: (context, themeProvider, child) {
+        themeNotifier.value = themeProvider.themeMode;
+        final currentMode = themeProvider.themeMode;
         return GetMaterialApp(
           translations: AppTranslations(),
           locale: initialLocale,

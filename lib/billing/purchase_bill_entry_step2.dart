@@ -35,23 +35,35 @@ extension _PurchaseBillEntryPageStateStep2 on _PurchaseBillEntryPageState {
                 spacing: 12,
                 runSpacing: 8,
                 children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFEFF6FF),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.blue.shade100),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: const [
-                        Icon(Icons.filter_alt_outlined, color: AppColors.primary, size: 16),
-                        SizedBox(width: 4),
-                        Text(
-                          "Filter Category & Brand",
-                          style: TextStyle(color: AppColors.primary, fontSize: 12, fontWeight: FontWeight.bold),
+                  InkWell(
+                    onTap: _showCategoryBrandFilterDialog,
+                    borderRadius: BorderRadius.circular(8),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: (filterCategory != null || filterBrand != null)
+                            ? const Color(0xFFDBEAFE)
+                            : const Color(0xFFEFF6FF),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: (filterCategory != null || filterBrand != null)
+                              ? const Color(0xFF3B82F6)
+                              : Colors.blue.shade100,
                         ),
-                      ],
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.filter_alt_outlined, color: AppColors.primary, size: 16),
+                          const SizedBox(width: 4),
+                          Text(
+                            filterCategory != null || filterBrand != null
+                                ? "Filtered (${[filterCategory, filterBrand].where((e) => e != null).join(', ')})"
+                                : "Filter Category & Brand",
+                            style: const TextStyle(color: AppColors.primary, fontSize: 12, fontWeight: FontWeight.bold),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                   Row(
@@ -102,7 +114,7 @@ extension _PurchaseBillEntryPageStateStep2 on _PurchaseBillEntryPageState {
                         Expanded(child: _buildFormTextField("Primary Name", primaryNameController, "Primary Name...")),
                         if (enableSecondaryName) ...[
                           const SizedBox(width: 12),
-                          Expanded(child: _buildFormTextField("Secondary Name", secondaryNameController, "Local / Secondary Name...")),
+                          Expanded(child: _buildFormTextField("Secondary Name", secondaryNameController, "Local / Secondary...")),
                         ],
                         const SizedBox(width: 12),
                         Expanded(child: _buildFormTextField("Qty *", qtyController, "1", isNumeric: true)),
@@ -122,7 +134,7 @@ extension _PurchaseBillEntryPageStateStep2 on _PurchaseBillEntryPageState {
                         _buildFormTextField("Primary Name", primaryNameController, "Primary Name..."),
                         if (enableSecondaryName) ...[
                           const SizedBox(height: 12),
-                          _buildFormTextField("Secondary Name", secondaryNameController, "Local / Secondary Name..."),
+                          _buildFormTextField("Secondary Name", secondaryNameController, "Local / Secondary..."),
                         ],
                         const SizedBox(height: 12),
                         Row(
@@ -254,6 +266,19 @@ extension _PurchaseBillEntryPageStateStep2 on _PurchaseBillEntryPageState {
   }
 
   Widget _buildFormProductSelectField() {
+    final filteredDropdownProducts = products.where((p) {
+      if (filterCategory != null && filterCategory!.isNotEmpty && filterCategory != "-- All Categories --") {
+        final cat = (p['category_name'] ?? p['category']?['name'] ?? p['category'] ?? "").toString().toLowerCase();
+        if (!cat.contains(filterCategory!.toLowerCase())) return false;
+      }
+      if (filterBrand != null && filterBrand!.isNotEmpty && filterBrand != "-- All Brands --") {
+        final name = (p['product_name'] ?? p['name'] ?? "").toString().toLowerCase();
+        final brand = (p['brand'] ?? p['brand_name'] ?? "").toString().toLowerCase();
+        if (!name.contains(filterBrand!.toLowerCase()) && !brand.contains(filterBrand!.toLowerCase())) return false;
+      }
+      return true;
+    }).toList();
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -263,7 +288,7 @@ extension _PurchaseBillEntryPageStateStep2 on _PurchaseBillEntryPageState {
         ),
         const SizedBox(height: 6),
         SearchableProductDropdown(
-          products: products,
+          products: filteredDropdownProducts.isNotEmpty ? filteredDropdownProducts : products,
           selectedProduct: selectedFormProduct,
           isLoading: isProductsLoading,
           onSelected: (product) {
@@ -417,7 +442,7 @@ extension _PurchaseBillEntryPageStateStep2 on _PurchaseBillEntryPageState {
             SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               child: DataTable(
-                headingRowColor: MaterialStateProperty.all(const Color(0xFFF8FAFC)),
+                headingRowColor: WidgetStateProperty.all(const Color(0xFFF8FAFC)),
                 columnSpacing: 20,
                 horizontalMargin: 16,
                 columns: const [
@@ -428,7 +453,9 @@ extension _PurchaseBillEntryPageStateStep2 on _PurchaseBillEntryPageState {
                   DataColumn(label: Text("UNIT", style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF475569)))),
                   DataColumn(label: Text("RATE (EXCL. TAX)", style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF475569)))),
                   DataColumn(label: Text("RATE (INCL. TAX)", style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF475569)))),
-                  DataColumn(label: Text("ACTION", style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF475569)))),
+                  DataColumn(label: Text("DISCOUNT", style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF475569)))),
+                  DataColumn(label: Text("TAXABLE AMOUNT", style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF475569)))),
+                  DataColumn(label: Text("ACTIONS", style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF475569)))),
                 ],
                 rows: List.generate(filtered.length, (index) {
                   final item = filtered[index];
@@ -454,6 +481,8 @@ extension _PurchaseBillEntryPageStateStep2 on _PurchaseBillEntryPageState {
                       DataCell(Text(item.unit, style: const TextStyle(fontSize: 12))),
                       DataCell(Text("₹${item.rateExcl.toStringAsFixed(2)}", style: const TextStyle(fontSize: 12))),
                       DataCell(Text("₹${item.rateIncl.toStringAsFixed(2)}", style: const TextStyle(fontSize: 12))),
+                      DataCell(Text("₹${item.discount.toStringAsFixed(2)}", style: const TextStyle(fontSize: 12))),
+                      DataCell(Text("₹${item.taxable.toStringAsFixed(2)}", style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold))),
                       DataCell(
                         IconButton(
                           icon: const Icon(Icons.delete_outline, color: Colors.red, size: 18),

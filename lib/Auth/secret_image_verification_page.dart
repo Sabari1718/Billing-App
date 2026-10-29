@@ -137,7 +137,10 @@ class _SecretImageVerificationPageState
           final billingToken = billingResponse["token"] ?? billingResponse["data"]?["token"];
           if (billingToken != null) {
             final prefs = await SharedPreferences.getInstance();
-            await prefs.setString("billing_auth_token", billingToken);
+            final tokenStr = billingToken.toString();
+            await prefs.setString("auth_token", tokenStr);
+            await prefs.setString("billing_auth_token", tokenStr);
+            await prefs.setString("token", tokenStr);
             await prefs.setString("cached_email", widget.email);
             await prefs.setString("cached_password", widget.password);
           }

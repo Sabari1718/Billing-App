@@ -8,6 +8,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:billingapp/billing/checkout_screen.dart';
 import 'package:billingapp/utils/app_logger.dart';
+import 'package:billingapp/billing/billing_mode_selector.dart';
 
 part 'generate_bill_logic.dart';
 part 'generate_bill_widgets.dart';
@@ -102,12 +103,14 @@ class _CustomerScreenState extends State<CustomerScreen> with WidgetsBindingObse
   Customer? selectedCustomer;
   bool loading = false;
   String? errorMessage;
-  String selectedMainTab = "User"; // navigation tab
-  String productSearchBy = "Name"; // dropdown option
+  String selectedMainTab = "User"; // navigation tab default to User matching photo
+  String productSearchBy = "Product Name"; // dropdown option
   bool _isLaunchingRegistration = false;
   
   // Product state
   List<ProductStock> productResults = [];
+  List<ProductStock> allAvailableStocks = [];
+  bool isStocksInitialLoading = false;
   ProductStock? selectedProduct;
   List<ProductStock> selectedBillItems = [];
   bool productLoading = false;
@@ -161,6 +164,7 @@ class _CustomerScreenState extends State<CustomerScreen> with WidgetsBindingObse
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    loadAllStocks();
   }
 
   @override
@@ -201,35 +205,72 @@ class _CustomerScreenState extends State<CustomerScreen> with WidgetsBindingObse
       child: Scaffold(
         backgroundColor: const Color(0xFFF8FAFC),
         appBar: AppBar(
-          title: const Text("Customer Search", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          title: const Text("Generate Bill", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
           elevation: 0,
           backgroundColor: Colors.white,
-          foregroundColor: Colors.black,
+          foregroundColor: const Color(0xFF1E293B),
+          actions: const [
+            BillingModeSelector(currentMode: "Sale"),
+          ],
         ),
         body: SingleChildScrollView(
           padding: const EdgeInsets.all(16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // Top Blue Header Banner Tabs (Photo 1 & Photo 4)
               Container(
-                padding: const EdgeInsets.all(4),
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade100,
-                  borderRadius: BorderRadius.circular(12),
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                decoration: const BoxDecoration(
+                  color: Color(0xFF0D6EFD), // Bootstrap / Web Blue
+                  borderRadius: BorderRadius.all(Radius.circular(8)),
                 ),
                 child: Row(
                   children: [
-                    _buildTopTabButton("User", selectedMainTab == "User", () {
-                      setState(() => selectedMainTab = "User");
-                    }),
-                    const SizedBox(width: 4),
-                    _buildTopTabButton("Products", selectedMainTab == "Products", () {
-                      setState(() => selectedMainTab = "Products");
-                    }),
+                    InkWell(
+                      onTap: () => setState(() => selectedMainTab = "User"),
+                      borderRadius: BorderRadius.circular(6),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: selectedMainTab == "User" ? Colors.white : Colors.transparent,
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          "User",
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                            color: selectedMainTab == "User" ? const Color(0xFF0D6EFD) : Colors.white,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    InkWell(
+                      onTap: () => setState(() => selectedMainTab = "Products"),
+                      borderRadius: BorderRadius.circular(6),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: selectedMainTab == "Products" ? Colors.white : Colors.transparent,
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          "Products",
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                            color: selectedMainTab == "Products" ? const Color(0xFF0D6EFD) : Colors.white,
+                          ),
+                        ),
+                      ),
+                    ),
                   ],
                 ),
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 16),
               if (selectedMainTab == "User")
                 _buildCustomerSearchSection()
               else
@@ -270,14 +311,18 @@ class Customer {
                    '').toString();
 
     String mob = (json['customer_phone'] ?? 
+                  json['phone_number'] ??
+                  json['phoneNumber'] ??
                   json['mobile_no'] ?? 
                   json['mobile'] ?? 
                   json['phone'] ?? 
+                  json['business_phone'] ??
                   json['contact'] ?? 
                   json['contact_no'] ?? 
                   '').toString();
 
     String type = (json['customer_type'] ?? 
+                   json['customerType'] ??
                    json['business_type'] ?? 
                    json['type'] ?? 
                    '').toString();
@@ -294,8 +339,18 @@ class Customer {
                   '').toString();
 
     var meta = json['customer_meta'] ?? json['meta'] ?? json['business_meta'] ?? json['meta_data'];
-    String address = (json['address'] ?? json['location'] ?? json['addr'] ?? '').toString();
-    String email = (json['email'] ?? json['email_id'] ?? json['mail'] ?? '').toString();
+    
+    List<String> addrParts = [
+      json['door_number']?.toString() ?? '',
+      json['street_name']?.toString() ?? '',
+      json['area']?.toString() ?? '',
+      json['district']?.toString() ?? '',
+      json['pincode']?.toString() ?? '',
+    ].where((s) => s.isNotEmpty && s != 'null').toList();
+    String composedAddr = addrParts.join(', ');
+
+    String address = (json['address'] ?? json['location'] ?? json['addr'] ?? (composedAddr.isNotEmpty ? composedAddr : '')).toString();
+    String email = (json['email'] ?? json['email_id'] ?? json['mail'] ?? json['business_email'] ?? '').toString();
 
     if (meta is Map) {
       if (address.isEmpty || address == "null") {
@@ -314,6 +369,13 @@ class Customer {
     if (gst == "null") gst = "";
     if (pan == "null") pan = "";
 
+    if (json['is_unregistered'] == 1 || json['is_unregistered'] == true || json['unregistered'] == true) {
+      type = "Unregistered";
+    }
+    if (type.isEmpty) {
+      type = "Unregistered";
+    }
+
     return Customer(
       name: name,
       mobile: mob,
@@ -330,9 +392,13 @@ class ProductStock {
   final String stockId;
   final String productId;
   final String productName;
+  final String productCode;
   final String supplierName;
   final String category;
+  final String brand;
   final String sku;
+  final String baseImage;
+  final double mrp;
   final String variant;
   final String warranty;
   final int qty;
@@ -354,16 +420,23 @@ class ProductStock {
   final String taxType;
   final String discountType;
   final bool isRequest;
+  final double gstRate;
+  final double sellingPriceWithoutGst;
+  final double sellingPriceWithGst;
 
   ProductStock({
     required this.stockId,
     this.productId = "",
     required this.productName,
+    this.productCode = "",
     required this.supplierName,
     required this.category,
+    this.brand = "",
     this.variantId = "",
     this.variantTypeId = "",
     this.sku = "",
+    this.baseImage = "",
+    this.mrp = 0.0,
     this.variant = "",
     this.warranty = "",
     this.qty = 0,
@@ -383,6 +456,9 @@ class ProductStock {
     this.enteredDiscount = 0.0,
     this.taxType = "%",
     this.discountType = "₹",
+    this.gstRate = 0.0,
+    this.sellingPriceWithoutGst = 0.0,
+    this.sellingPriceWithGst = 0.0,
   });
 
   ProductStock copyWith({
@@ -403,16 +479,27 @@ class ProductStock {
     String? discountType,
     double? unitPrice,
     double? normalPrice,
+    String? productCode,
+    String? brand,
+    String? baseImage,
+    double? mrp,
+    double? gstRate,
+    double? sellingPriceWithoutGst,
+    double? sellingPriceWithGst,
   }) {
     return ProductStock(
       stockId: stockId,
       productId: productId,
       productName: productName,
+      productCode: productCode ?? this.productCode,
       supplierName: supplierName,
       category: category,
+      brand: brand ?? this.brand,
       variantId: variantId ?? this.variantId,
       variantTypeId: variantTypeId ?? this.variantTypeId,
       sku: sku,
+      baseImage: baseImage ?? this.baseImage,
+      mrp: mrp ?? this.mrp,
       variant: variant ?? this.variant,
       warranty: warranty,
       qty: qty ?? this.qty,
@@ -432,6 +519,9 @@ class ProductStock {
       enteredDiscount: enteredDiscount ?? this.enteredDiscount,
       taxType: taxType ?? this.taxType,
       discountType: discountType ?? this.discountType,
+      gstRate: gstRate ?? this.gstRate,
+      sellingPriceWithoutGst: sellingPriceWithoutGst ?? this.sellingPriceWithoutGst,
+      sellingPriceWithGst: sellingPriceWithGst ?? this.sellingPriceWithGst,
     );
   }
 }

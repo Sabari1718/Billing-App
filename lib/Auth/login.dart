@@ -4,7 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:billingapp/utils/app_logger.dart';
 
+import 'package:get/get.dart';
 import 'api service.dart';
+import 'billing dashboardc.dart';
 import 'secret_image_verification_page.dart';
 
 class LoginPage extends StatefulWidget {
@@ -57,11 +59,38 @@ class _LoginPageState extends State<LoginPage> {
               if (token != null) {
                 final prefs = await SharedPreferences.getInstance();
 
-                await prefs.setString("auth_token", token);
-                await prefs.remove("token");
+                // Clear previous session selections so user starts fresh
+                await prefs.remove("selected_business_id");
+                await prefs.remove("business_id");
+                await prefs.remove("business_name");
+                await prefs.remove("selected_platform_id");
+                await prefs.remove("platform_id");
+                await prefs.remove("selected_store_id");
+                await prefs.remove("store_id");
+                await prefs.remove("store_name");
+                await prefs.remove("selected_store_name");
+
+                final tokenStr = token.toString();
+                await prefs.setString("auth_token", tokenStr);
+                await prefs.setString("billing_auth_token", tokenStr);
+                await prefs.setString("token", tokenStr);
+                await prefs.setString("cached_email", email.trim());
+                await prefs.setString("cached_password", password.trim());
 
                 if (userData != null) {
                   await prefs.setString("user", jsonEncode(userData));
+                  if (userData["id"] != null) await prefs.setString("user_id", userData["id"].toString());
+                  if (userData["user_main_id"] != null) await prefs.setString("user_main_id", userData["user_main_id"].toString());
+                  if (userData["name"] != null) await prefs.setString("user_name", userData["name"].toString());
+                  if (userData["email"] != null) await prefs.setString("user_email", userData["email"].toString());
+                  if (userData["phone"] != null) await prefs.setString("user_phone", userData["phone"].toString());
+                  if (userData["role"] != null) await prefs.setString("user_role", userData["role"].toString());
+                }
+
+                if (Get.isRegistered<DashboardController>()) {
+                  try {
+                    Get.delete<DashboardController>(force: true);
+                  } catch (_) {}
                 }
 
                 AppLogger.success("User logged in successfully");

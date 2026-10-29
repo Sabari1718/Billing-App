@@ -18,6 +18,7 @@ mixin AddSupplierLogic on State<AddSupplierScreen> {
   final TextEditingController city = TextEditingController();
   final TextEditingController state = TextEditingController();
   final TextEditingController pincode = TextEditingController();
+  final TextEditingController generalPincode = TextEditingController();
 
   // Associated branches
   List<BranchRowData> branchesList = [];
@@ -42,9 +43,9 @@ mixin AddSupplierLogic on State<AddSupplierScreen> {
     city.dispose();
     state.dispose();
     pincode.dispose();
+    generalPincode.dispose();
     for (var b in branchesList) {
-      b.nameController.dispose();
-      b.phoneController.dispose();
+      b.dispose();
     }
     super.dispose();
   }
@@ -98,9 +99,12 @@ mixin AddSupplierLogic on State<AddSupplierScreen> {
         formattedBranches.add({
           "branch_name": b.nameController.text.trim(),
           "branch_phone": b.phoneController.text.trim(),
+          "branch_pincode": b.pincodeController.text.trim(),
         });
       }
     }
+
+    final finalPin = pincode.text.trim().isNotEmpty ? pincode.text.trim() : generalPincode.text.trim();
 
     final body = {
       "supplier_name": supplierName.text.trim(),
@@ -115,7 +119,7 @@ mixin AddSupplierLogic on State<AddSupplierScreen> {
       "landmark": landmark.text.trim(),
       "city": city.text.trim(),
       "state": state.text.trim(),
-      "pincode": pincode.text.trim(),
+      "pincode": finalPin,
       "status": "verified",
       "is_same_as_permanent": false,
       "branches": formattedBranches,

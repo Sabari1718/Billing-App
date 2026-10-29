@@ -7,6 +7,8 @@ import 'package:billingapp/main.dart'; // To access themeNotifier
 import 'package:billingapp/settings/pin_auth_gate.dart';
 import 'package:get/get.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:provider/provider.dart' as provider_pkg;
+import 'package:billingapp/mainscreen/theme/theme_provider.dart';
 
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
@@ -168,11 +170,17 @@ class _SettingsPageState extends State<SettingsPage> {
                       isDark ? Icons.dark_mode : Icons.light_mode,
                       color: isDark ? Colors.indigo : Colors.orange,
                     ),
-                    value: themeNotifier.value == ThemeMode.dark,
+                    value: isDark,
                     onChanged: (val) {
                       setState(() {
                         themeNotifier.value = val ? ThemeMode.dark : ThemeMode.light;
                       });
+                      try {
+                        final themeProv = provider_pkg.Provider.of<ThemeProvider>(context, listen: false);
+                        themeProv.setDarkMode(val);
+                      } catch (e) {
+                        debugPrint("Error setting dark mode: $e");
+                      }
                     },
                     activeColor: Theme.of(context).colorScheme.primary,
                   ),
