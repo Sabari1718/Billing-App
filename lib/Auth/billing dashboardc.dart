@@ -462,49 +462,14 @@ class DashboardUI extends StatelessWidget {
   }
 
   Widget buildCard(BuildContext context, String title, IconData iconData, Color iconColor, String role) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return GestureDetector(
+    return _buildModernModuleCard(
+      context: context,
+      title: title,
+      subtitle: "Open $title",
+      icon: iconData,
+      accentColor: iconColor,
+      isDark: Theme.of(context).brightness == Brightness.dark,
       onTap: () => _handleCardTap(context, title, role),
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
-        decoration: BoxDecoration(
-          color: Theme.of(context).cardColor,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: isDark ? Colors.black26 : Colors.black.withOpacity(0.04),
-              blurRadius: 8,
-              offset: const Offset(0, 3),
-            )
-          ],
-          border: Border.all(color: isDark ? Colors.white10 : Colors.grey.shade200),
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: iconColor.withOpacity(0.12),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(iconData, size: 24, color: iconColor),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              title,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 13,
-                color: Theme.of(context).colorScheme.onSurface,
-              ),
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
-      ),
     );
   }
 
@@ -549,6 +514,827 @@ class DashboardUI extends StatelessWidget {
           TextButton(
             onPressed: () => Navigator.pop(context),
             child: const Text("Got it", style: TextStyle(color: Color(0xFF2563EB), fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHeroBanner(BuildContext context, DashboardController controller, bool isDark) {
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(24),
+        gradient: const LinearGradient(
+          colors: [
+            Color(0xFF1E3A8A), // Deep navy
+            Color(0xFF2563EB), // Vibrant blue
+            Color(0xFF3B82F6), // Sky highlight
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF2563EB).withOpacity(0.32),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Stack(
+        children: [
+          Positioned(
+            right: -25,
+            top: -25,
+            child: Container(
+              width: 130,
+              height: 130,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.white.withOpacity(0.08),
+              ),
+            ),
+          ),
+          Positioned(
+            left: 140,
+            bottom: -35,
+            child: Container(
+              width: 90,
+              height: 90,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.white.withOpacity(0.05),
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Flexible(
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.18),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: Colors.white.withOpacity(0.25)),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Container(
+                              width: 8,
+                              height: 8,
+                              decoration: const BoxDecoration(
+                                color: Color(0xFF4ADE80),
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            Flexible(
+                              child: Obx(() => Text(
+                                controller.storeStatus.value.isNotEmpty ? controller.storeStatus.value.toUpperCase() : "ACTIVE POS",
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: GoogleFonts.inter(
+                                  color: Colors.white,
+                                  fontSize: 10.5,
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: 0.5,
+                                ),
+                              )),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    InkWell(
+                      onTap: () => showAnnouncementsDialog(context, isDark),
+                      borderRadius: BorderRadius.circular(12),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.15),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.white.withOpacity(0.25)),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.campaign_outlined, color: Colors.white, size: 15),
+                            const SizedBox(width: 4),
+                            Text(
+                              "Updates",
+                              style: GoogleFonts.inter(
+                                color: Colors.white,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                Text(
+                  "Welcome back,",
+                  style: GoogleFonts.inter(
+                    color: Colors.white.withOpacity(0.85),
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Obx(() => Text(
+                  controller.businessName.value.isNotEmpty ? controller.businessName.value : "My Business",
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.inter(
+                    color: Colors.white,
+                    fontSize: 22,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -0.5,
+                  ),
+                )),
+                const SizedBox(height: 4),
+                Obx(() => Row(
+                  children: [
+                    Icon(Icons.storefront_outlined, size: 14, color: Colors.white.withOpacity(0.85)),
+                    const SizedBox(width: 5),
+                    Flexible(
+                      child: Text(
+                        controller.storeName.value.isNotEmpty ? controller.storeName.value : "Primary Store",
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: GoogleFonts.inter(
+                          color: Colors.white.withOpacity(0.92),
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ],
+                )),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      flex: 6,
+                      child: ElevatedButton.icon(
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (_) => CustomerScreen()),
+                          );
+                        },
+                        icon: const Icon(Icons.bolt_rounded, size: 18, color: Color(0xFF1E3A8A)),
+                        label: Text(
+                          "New Bill",
+                          style: GoogleFonts.inter(
+                            fontSize: 13.5,
+                            fontWeight: FontWeight.w800,
+                            color: const Color(0xFF1E3A8A),
+                          ),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.white,
+                          foregroundColor: const Color(0xFF1E3A8A),
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          elevation: 3,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      flex: 5,
+                      child: OutlinedButton.icon(
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (_) => const BillListScreen(token: '')),
+                          );
+                        },
+                        icon: const Icon(Icons.receipt_outlined, size: 16, color: Colors.white),
+                        label: Text(
+                          "Invoices",
+                          style: GoogleFonts.inter(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.white,
+                          ),
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          side: BorderSide(color: Colors.white.withOpacity(0.4), width: 1.2),
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildQuickMetrics(BuildContext context, DashboardController controller, bool isDark) {
+    final currencyFormat = NumberFormat.currency(locale: 'en_IN', symbol: '₹', decimalDigits: 0);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                "Business Overview",
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: GoogleFonts.inter(
+                  fontSize: 17,
+                  fontWeight: FontWeight.w800,
+                  color: isDark ? Colors.white : const Color(0xFF0F172A),
+                  letterSpacing: -0.3,
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            InkWell(
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => DashboardAnalyticsPage(role: controller.role.value)),
+                );
+              },
+              borderRadius: BorderRadius.circular(8),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                child: Row(
+                  children: [
+                    Text(
+                      "Analytics",
+                      style: GoogleFonts.inter(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w700,
+                        color: const Color(0xFF2563EB),
+                      ),
+                    ),
+                    const SizedBox(width: 2),
+                    const Icon(Icons.arrow_forward_ios_rounded, size: 12, color: Color(0xFF2563EB)),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        GridView.count(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          crossAxisCount: 2,
+          crossAxisSpacing: 10,
+          mainAxisSpacing: 10,
+          childAspectRatio: 1.35,
+          children: [
+            _buildMetricTile(
+              context,
+              title: "Gross Sales",
+              value: currencyFormat.format(controller.totalSales.value),
+              icon: Icons.trending_up_rounded,
+              color: const Color(0xFF2563EB),
+              isDark: isDark,
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => DashboardAnalyticsPage(role: controller.role.value)),
+              ),
+            ),
+            _buildMetricTile(
+              context,
+              title: "Bills Served",
+              value: "${controller.ordersServedCount.value}",
+              icon: Icons.receipt_long_rounded,
+              color: const Color(0xFF10B981),
+              isDark: isDark,
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const BillListScreen(token: '')),
+              ),
+            ),
+            _buildMetricTile(
+              context,
+              title: "Inventory",
+              value: "${controller.productsCount.value} Items",
+              icon: Icons.inventory_2_outlined,
+              color: const Color(0xFFF59E0B),
+              isDark: isDark,
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => ProductMenuPage(role: controller.role.value)),
+              ),
+            ),
+            _buildMetricTile(
+              context,
+              title: "Net Profit",
+              value: currencyFormat.format(controller.totalProfit.value),
+              icon: Icons.account_balance_wallet_outlined,
+              color: const Color(0xFF8B5CF6),
+              isDark: isDark,
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => DashboardAnalyticsPage(role: controller.role.value)),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildMetricTile(
+    BuildContext context, {
+    required String title,
+    required String value,
+    required IconData icon,
+    required Color color,
+    required bool isDark,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF1E293B) : Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+            width: 1,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: isDark ? Colors.black26 : Colors.black.withOpacity(0.02),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: color.withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(icon, size: 16, color: color),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.inter(
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w600,
+                      color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const Spacer(),
+            Text(
+              value,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: GoogleFonts.inter(
+                fontSize: 15,
+                fontWeight: FontWeight.w800,
+                color: isDark ? Colors.white : const Color(0xFF0F172A),
+                letterSpacing: -0.3,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildQuickShortcuts(BuildContext context, DashboardController controller, bool isDark) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          "Quick Billing Actions",
+          style: GoogleFonts.inter(
+            fontSize: 17,
+            fontWeight: FontWeight.w800,
+            color: isDark ? Colors.white : const Color(0xFF0F172A),
+            letterSpacing: -0.3,
+          ),
+        ),
+        const SizedBox(height: 12),
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          physics: const BouncingScrollPhysics(),
+          child: Row(
+            children: [
+              _buildShortcutPill(
+                context,
+                title: "New Bill",
+                icon: Icons.add_circle_outline_rounded,
+                color: const Color(0xFF10B981),
+                isDark: isDark,
+                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => CustomerScreen())),
+              ),
+              const SizedBox(width: 10),
+              _buildShortcutPill(
+                context,
+                title: "Invoices",
+                icon: Icons.description_outlined,
+                color: const Color(0xFF2563EB),
+                isDark: isDark,
+                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const BillListScreen(token: ''))),
+              ),
+              const SizedBox(width: 10),
+              _buildShortcutPill(
+                context,
+                title: "Add Product",
+                icon: Icons.add_box_outlined,
+                color: const Color(0xFFF59E0B),
+                isDark: isDark,
+                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ProductEntryPage())),
+              ),
+              const SizedBox(width: 10),
+              _buildShortcutPill(
+                context,
+                title: "Returns",
+                icon: Icons.assignment_return_outlined,
+                color: const Color(0xFFEF4444),
+                isDark: isDark,
+                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CustomerReturnsScreen())),
+              ),
+              const SizedBox(width: 10),
+              _buildShortcutPill(
+                context,
+                title: "Suppliers",
+                icon: Icons.people_outline_rounded,
+                color: const Color(0xFF8B5CF6),
+                isDark: isDark,
+                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SupplierListPage())),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildShortcutPill(
+    BuildContext context, {
+    required String title,
+    required IconData icon,
+    required Color color,
+    required bool isDark,
+    required VoidCallback onTap,
+  }) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF1E293B) : Colors.white,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+              width: 1,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: isDark ? Colors.black26 : Colors.black.withOpacity(0.02),
+                blurRadius: 6,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.12),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(icon, size: 16, color: color),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                title,
+                style: GoogleFonts.inter(
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w700,
+                  color: isDark ? Colors.white : const Color(0xFF1E293B),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildModulesSection(BuildContext context, String currentRole, bool isDark) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                "Management Modules",
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: GoogleFonts.inter(
+                  fontSize: 17,
+                  fontWeight: FontWeight.w800,
+                  color: isDark ? Colors.white : const Color(0xFF0F172A),
+                  letterSpacing: -0.3,
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: const Color(0xFF2563EB).withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                currentRole.toUpperCase(),
+                style: GoogleFonts.inter(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w800,
+                  color: const Color(0xFF2563EB),
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        GridView.count(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          crossAxisCount: 2,
+          crossAxisSpacing: 12,
+          mainAxisSpacing: 12,
+          childAspectRatio: 1.05,
+          children: [
+            _buildModernModuleCard(
+              context: context,
+              title: "Billing & POS",
+              subtitle: "Bills, Invoices & Returns",
+              icon: Icons.receipt_long_rounded,
+              accentColor: const Color(0xFF10B981),
+              isDark: isDark,
+              onTap: () => _handleCardTap(context, "Billing", currentRole),
+            ),
+            _buildModernModuleCard(
+              context: context,
+              title: "Products",
+              subtitle: "Items, Stock & Pricing",
+              icon: Icons.inventory_2_rounded,
+              accentColor: const Color(0xFFF59E0B),
+              isDark: isDark,
+              onTap: () => _handleCardTap(context, "Product", currentRole),
+            ),
+            _buildModernModuleCard(
+              context: context,
+              title: "Suppliers",
+              subtitle: "Vendors & Purchases",
+              icon: Icons.local_shipping_rounded,
+              accentColor: const Color(0xFF6366F1),
+              isDark: isDark,
+              onTap: () => _handleCardTap(context, "Supplier", currentRole),
+            ),
+            _buildModernModuleCard(
+              context: context,
+              title: "Analytics",
+              subtitle: "Sales trends & charts",
+              icon: Icons.analytics_rounded,
+              accentColor: const Color(0xFF2563EB),
+              isDark: isDark,
+              onTap: () => _handleCardTap(context, "Dashboard", currentRole),
+            ),
+            _buildModernModuleCard(
+              context: context,
+              title: "Sales Counter",
+              subtitle: "Terminal & registers",
+              icon: Icons.point_of_sale_rounded,
+              accentColor: const Color(0xFF0D9488),
+              isDark: isDark,
+              onTap: () => _handleCardTap(context, "Sales", currentRole),
+            ),
+            _buildModernModuleCard(
+              context: context,
+              title: "Stores",
+              subtitle: "Branches & outlets",
+              icon: Icons.storefront_rounded,
+              accentColor: const Color(0xFFEC4899),
+              isDark: isDark,
+              onTap: () => _handleCardTap(context, "Store", currentRole),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildModernModuleCard({
+    required BuildContext context,
+    required String title,
+    required String subtitle,
+    required IconData icon,
+    required Color accentColor,
+    required bool isDark,
+    required VoidCallback onTap,
+  }) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(20),
+        child: Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF1E293B) : Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+              width: 1.2,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: isDark ? Colors.black26 : Colors.black.withOpacity(0.03),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: accentColor.withOpacity(0.12),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: Icon(icon, size: 24, color: accentColor),
+                  ),
+                  Icon(
+                    Icons.arrow_forward_rounded,
+                    size: 16,
+                    color: isDark ? const Color(0xFF64748B) : const Color(0xFFCBD5E1),
+                  ),
+                ],
+              ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.inter(
+                      fontSize: 14.5,
+                      fontWeight: FontWeight.w800,
+                      color: isDark ? Colors.white : const Color(0xFF0F172A),
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.inter(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w500,
+                      color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStoreFooter(BuildContext context, DashboardController controller, bool isDark) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E293B) : Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: const Color(0xFF2563EB).withOpacity(0.1),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Icon(Icons.hub_outlined, color: Color(0xFF2563EB), size: 20),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Flexible(
+                      child: Obx(() => Text(
+                        controller.storeName.value.isNotEmpty ? controller.storeName.value : "Default Outlet",
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: GoogleFonts.inter(
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w700,
+                          color: isDark ? Colors.white : const Color(0xFF0F172A),
+                        ),
+                      )),
+                    ),
+                    const SizedBox(width: 6),
+                    Container(
+                      width: 6,
+                      height: 6,
+                      decoration: const BoxDecoration(
+                        color: Color(0xFF10B981),
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 2),
+                Obx(() {
+                  final phone = controller.storeMobile.value;
+                  final addr = controller.storeAddress.value;
+                  final text = phone.isNotEmpty ? "Ph: $phone" : (addr.isNotEmpty ? addr : "System Online • Cloud Synced");
+                  return Text(
+                    text,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.inter(
+                      fontSize: 11,
+                      color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                    ),
+                  );
+                }),
+              ],
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.sync_rounded, size: 20),
+            color: const Color(0xFF2563EB),
+            tooltip: "Refresh Store Data",
+            onPressed: controller.fetchDashboardData,
           ),
         ],
       ),
@@ -661,6 +1447,9 @@ class DashboardUI extends StatelessWidget {
       }),
       appBar: AppBar(
         titleSpacing: 0,
+        elevation: 0,
+        backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+        surfaceTintColor: Colors.transparent,
         title: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -798,60 +1587,30 @@ class DashboardUI extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // QUICK NAVIGATION SECTION (MODULES)
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      "Quick Modules",
-                      style: GoogleFonts.inter(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w800,
-                        color: isDark ? Colors.white : const Color(0xFF0F172A),
-                        letterSpacing: -0.3,
-                      ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF2563EB).withOpacity(0.08),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Text(
-                        "${currentRole.toUpperCase()}",
-                        style: GoogleFonts.inter(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w700,
-                          color: const Color(0xFF2563EB),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 14),
+                // 1. HERO GREETING & POS BANNER
+                _buildHeroBanner(context, controller, isDark),
 
-                GridView.count(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  crossAxisCount: 2,
-                  crossAxisSpacing: 14,
-                  mainAxisSpacing: 14,
-                  childAspectRatio: 1.15,
-                  children: [
-                    // Business Setup - Commented out as requested
-                    // buildCard(context, "Business Setup", Icons.domain, Colors.blue, currentRole),
-                    buildCard(context, "Dashboard", Icons.dashboard_outlined, const Color(0xFF2563EB), currentRole),
-                    buildCard(context, "Product", Icons.inventory_2_outlined, Colors.orange, currentRole),
-                    buildCard(context, "Supplier", Icons.delivery_dining, Colors.deepOrange, currentRole),
-                    // Reorder - Commented out as requested
-                    // buildCard(context, "Reorder", Icons.sync_alt, Colors.deepPurple, currentRole),
-                    buildCard(context, "Billing", Icons.receipt_long, Colors.green, currentRole),
-                    // Seller Update - Commented out as requested
-                    // buildCard(context, "Seller Update", Icons.update_outlined, Colors.pink, currentRole),
-                  ],
-                ),
+                const SizedBox(height: 18),
 
-                const SizedBox(height: 30),
+                // 2. LIVE STORE STATS & METRICS
+                _buildQuickMetrics(context, controller, isDark),
+
+                const SizedBox(height: 18),
+
+                // 3. QUICK SHORTCUTS ACTION BAR
+                _buildQuickShortcuts(context, controller, isDark),
+
+                const SizedBox(height: 18),
+
+                // 4. MANAGEMENT MODULES GRID
+                _buildModulesSection(context, currentRole, isDark),
+
+                const SizedBox(height: 18),
+
+                // 5. ACTIVE STORE STATUS FOOTER
+                _buildStoreFooter(context, controller, isDark),
+
+                const SizedBox(height: 24),
               ],
             ),
           ),
