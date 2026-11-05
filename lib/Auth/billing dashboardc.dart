@@ -3,6 +3,8 @@ import 'package:billingapp/purchase/purchase_update.dart';
 import 'package:billingapp/purchase/pricing_offers.dart';
 import 'package:billingapp/purchase/seller_update.dart';
 import 'package:billingapp/purchase/delivery_charges.dart';
+import 'package:billingapp/purchase/terms_conditions_page.dart';
+import 'package:billingapp/purchase/warranty_guarantee_page.dart';
 import 'package:billingapp/product/add product.dart';
 import 'package:billingapp/product/stock%20list.dart';
 import 'package:billingapp/product/storage.dart';
@@ -451,7 +453,7 @@ class DashboardUI extends StatelessWidget {
           builder: (_) => StoreMenuPage(role: role),
         ),
       );
-    } else if (title == "Seller Update") {
+    } else if (title == "Seller Update" || title == "Seller Policies") {
       Navigator.push(
         context,
         MaterialPageRoute(
@@ -1031,6 +1033,15 @@ class DashboardUI extends StatelessWidget {
                 isDark: isDark,
                 onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SupplierListPage())),
               ),
+              const SizedBox(width: 10),
+              _buildShortcutPill(
+                context,
+                title: "Seller Policies",
+                icon: Icons.policy_outlined,
+                color: const Color(0xFF6366F1),
+                isDark: isDark,
+                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => SellerUpdateMenuPage(role: controller.role.value))),
+              ),
             ],
           ),
         ),
@@ -1194,6 +1205,15 @@ class DashboardUI extends StatelessWidget {
               accentColor: const Color(0xFFEC4899),
               isDark: isDark,
               onTap: () => _handleCardTap(context, "Store", currentRole),
+            ),
+            _buildModernModuleCard(
+              context: context,
+              title: "Seller Policies",
+              subtitle: "Terms & Policies",
+              icon: Icons.policy_rounded,
+              accentColor: const Color(0xFF6366F1),
+              isDark: isDark,
+              onTap: () => _handleCardTap(context, "Seller Policies", currentRole),
             ),
           ],
         ),
@@ -1436,6 +1456,14 @@ class DashboardUI extends StatelessWidget {
                   leading: const Icon(Icons.dashboard_outlined),
                   title: const Text("Dashboard"),
                   onTap: () => Navigator.pop(context),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.policy_outlined),
+                  title: const Text("Seller Policies"),
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(context, MaterialPageRoute(builder: (_) => SellerUpdateMenuPage(role: controller.role.value)));
+                  },
                 ),
                 ExpansionTile(
                   leading: const Icon(Icons.settings),
@@ -2258,8 +2286,8 @@ class SellerUpdateMenuPage extends StatelessWidget {
           buildItem(context, "Pricing & Offers", const PricingOffersPage(), Icons.local_offer, Colors.purple),
           buildItem(context, "Seller Update", const SellerUpdatePage(), Icons.update, Colors.green),
           buildItem(context, "Delivery Charges", const DeliveryChargesPage(), Icons.local_shipping, Colors.teal),
-          buildItem(context, "Terms & Conditions", const PlaceholderDetailPage(title: "Terms & Conditions"), Icons.article_outlined, Colors.indigo),
-          buildItem(context, "Warranty & Guarantee", const PlaceholderDetailPage(title: "Warranty & Guarantee"), Icons.verified_user_outlined, Colors.deepOrange),
+          buildItem(context, "Terms & Conditions", const TermsConditionsPage(), Icons.article_outlined, Colors.indigo),
+          buildItem(context, "Warranty & Guarantee", const WarrantyGuaranteePage(), Icons.verified_user_outlined, Colors.deepOrange),
         ],
       ),
     );
