@@ -106,28 +106,48 @@ class DashboardController extends GetxController {
   Future<void> loadBusiness() async {
     final prefs = await SharedPreferences.getInstance();
 
-    String fetchedRole = prefs.getString("business_type")?.toLowerCase() ?? 
-                         prefs.getString("role")?.toLowerCase() ?? 
-                         prefs.getString("user_role")?.toLowerCase() ??
-                         "propagater";
-    
-    String bName = prefs.getString("business_name") ?? prefs.getString("user_name") ?? "";
+    String fetchedRole =
+        prefs.getString("business_type")?.toLowerCase() ??
+        prefs.getString("role")?.toLowerCase() ??
+        prefs.getString("user_role")?.toLowerCase() ??
+        "propagater";
+
+    String bName =
+        prefs.getString("business_name") ?? prefs.getString("user_name") ?? "";
     if (bName.isEmpty || bName == "Business") {
       bName = prefs.getString("user_name") ?? "";
     }
-    
-    String bId = prefs.getString("selected_business_id") ?? prefs.get("business_id")?.toString() ?? prefs.getString("user_id") ?? "";
+
+    String bId =
+        prefs.getString("selected_business_id") ??
+        prefs.get("business_id")?.toString() ??
+        prefs.getString("user_id") ??
+        "";
 
     businessName.value = bName.isNotEmpty ? bName : "Kalaivani";
     businessId.value = bId;
-    userMainId.value = prefs.getString("user_main_id") ?? prefs.getString("sec_cache_user_main_id") ?? prefs.getString("user_id") ?? "";
-    businessEmail.value = prefs.getString("business_email") ?? prefs.getString("user_email") ?? "";
-    businessPhone.value = prefs.getString("business_phone") ?? prefs.getString("user_phone") ?? "";
-    localAvatarPath.value = prefs.getString("persistent_profile_photo_path") ?? "";
+    userMainId.value =
+        prefs.getString("user_main_id") ??
+        prefs.getString("sec_cache_user_main_id") ??
+        prefs.getString("user_id") ??
+        "";
+    businessEmail.value =
+        prefs.getString("business_email") ??
+        prefs.getString("user_email") ??
+        "";
+    businessPhone.value =
+        prefs.getString("business_phone") ??
+        prefs.getString("user_phone") ??
+        "";
+    localAvatarPath.value =
+        prefs.getString("persistent_profile_photo_path") ?? "";
     role.value = fetchedRole;
 
     // Load active store info from SharedPreferences if previously selected
-    final savedStoreName = prefs.getString("store_name") ?? prefs.getString("selected_store_name") ?? "";
+    final savedStoreName =
+        prefs.getString("store_name") ??
+        prefs.getString("selected_store_name") ??
+        "";
     if (savedStoreName.isNotEmpty) {
       storeName.value = savedStoreName;
     }
@@ -148,7 +168,8 @@ class DashboardController extends GetxController {
           "email": cachedEmail,
           "password": cachedPassword,
         });
-        final billingToken = billingResponse["token"] ?? billingResponse["data"]?["token"];
+        final billingToken =
+            billingResponse["token"] ?? billingResponse["data"]?["token"];
         if (billingToken != null) {
           final tokenStr = billingToken.toString();
           await prefs.setString("auth_token", tokenStr);
@@ -169,16 +190,35 @@ class DashboardController extends GetxController {
       final prefs = await SharedPreferences.getInstance();
       final effectiveBusinessId = businessId.value.isNotEmpty
           ? businessId.value
-          : (prefs.getString("selected_business_id") ?? prefs.get("business_id")?.toString() ?? "52");
-      final effectivePlatformId = prefs.getString("selected_platform_id") ?? prefs.getString("platform_id") ?? "1";
-      final effectiveStoreId = prefs.getString("selected_store_id") ?? prefs.get("store_id")?.toString() ?? "";
+          : (prefs.getString("selected_business_id") ??
+                prefs.get("business_id")?.toString() ??
+                "52");
+      final effectivePlatformId =
+          prefs.getString("selected_platform_id") ??
+          prefs.getString("platform_id") ??
+          "1";
+      final effectiveStoreId =
+          prefs.getString("selected_store_id") ??
+          prefs.get("store_id")?.toString() ??
+          "";
 
       final results = await Future.wait([
-        ApiService.getStores(businessId: effectiveBusinessId, platformId: effectivePlatformId),
+        ApiService.getStores(
+          businessId: effectiveBusinessId,
+          platformId: effectivePlatformId,
+        ),
         ApiService.getNotifications(),
         ApiService.getUserPermissions(),
-        ApiService.getSalesBills(businessId: effectiveBusinessId, platformId: effectivePlatformId, storeId: effectiveStoreId),
-        ApiService.getPurchaseBills(businessId: effectiveBusinessId, platformId: effectivePlatformId, storeId: effectiveStoreId),
+        ApiService.getSalesBills(
+          businessId: effectiveBusinessId,
+          platformId: effectivePlatformId,
+          storeId: effectiveStoreId,
+        ),
+        ApiService.getPurchaseBills(
+          businessId: effectiveBusinessId,
+          platformId: effectivePlatformId,
+          storeId: effectiveStoreId,
+        ),
         ApiService.getAllocations(),
       ]);
 
@@ -190,28 +230,39 @@ class DashboardController extends GetxController {
       final allocRes = results[5];
 
       // 1. Process Stores API - Respect user selected store
-      if (storeRes["success"] == true && storeRes["data"] is List && (storeRes["data"] as List).isNotEmpty) {
+      if (storeRes["success"] == true &&
+          storeRes["data"] is List &&
+          (storeRes["data"] as List).isNotEmpty) {
         storesList.value = storeRes["data"] as List;
         Map? matchedStore;
         if (effectiveStoreId.isNotEmpty) {
           for (var s in storeRes["data"]) {
-            if (s is Map && (s["store_id"]?.toString() == effectiveStoreId || s["id"]?.toString() == effectiveStoreId)) {
+            if (s is Map &&
+                (s["store_id"]?.toString() == effectiveStoreId ||
+                    s["id"]?.toString() == effectiveStoreId)) {
               matchedStore = s;
               break;
             }
           }
         }
         matchedStore ??= storeRes["data"][0] as Map;
-        storeName.value = (matchedStore["store_name"] ?? matchedStore["name"] ?? storeName.value).toString();
+        storeName.value =
+            (matchedStore["store_name"] ??
+                    matchedStore["name"] ??
+                    storeName.value)
+                .toString();
         storeStatus.value = (matchedStore["status"] ?? "Active").toString();
         storeAddress.value = (matchedStore["address"] ?? "").toString();
-        storeMobile.value = (matchedStore["mobile"] ?? matchedStore["phone"] ?? "").toString();
+        storeMobile.value =
+            (matchedStore["mobile"] ?? matchedStore["phone"] ?? "").toString();
       }
 
       // 2. Process Notifications API
       if (notifRes["counts"] != null && notifRes["counts"] is Map) {
-        unreadNotificationsCount.value = int.tryParse(notifRes["counts"]["unread"]?.toString() ?? "0") ?? 0;
-        totalNotificationsCount.value = int.tryParse(notifRes["counts"]["total"]?.toString() ?? "0") ?? 0;
+        unreadNotificationsCount.value =
+            int.tryParse(notifRes["counts"]["unread"]?.toString() ?? "0") ?? 0;
+        totalNotificationsCount.value =
+            int.tryParse(notifRes["counts"]["total"]?.toString() ?? "0") ?? 0;
       }
 
       // 3. Process Permissions API
@@ -272,7 +323,12 @@ class DashboardController extends GetxController {
 
     for (var b in rawSalesBills) {
       if (b is Map) {
-        final amt = double.tryParse((b["final_amount"] ?? b["grand_total"] ?? b["total_amount"] ?? 0).toString()) ?? 0.0;
+        final amt =
+            double.tryParse(
+              (b["final_amount"] ?? b["grand_total"] ?? b["total_amount"] ?? 0)
+                  .toString(),
+            ) ??
+            0.0;
         sumSales += amt;
         countOrders++;
 
@@ -316,7 +372,12 @@ class DashboardController extends GetxController {
 
     for (var p in rawPurchaseBills) {
       if (p is Map) {
-        final amt = double.tryParse((p["total_amount"] ?? p["grand_total"] ?? p["final_amount"] ?? 0).toString()) ?? 0.0;
+        final amt =
+            double.tryParse(
+              (p["total_amount"] ?? p["grand_total"] ?? p["final_amount"] ?? 0)
+                  .toString(),
+            ) ??
+            0.0;
         sumPurchases += amt;
         countPurchases++;
 
@@ -383,11 +444,7 @@ class DashboardController extends GetxController {
     final prefs = await SharedPreferences.getInstance();
     await prefs.clear();
 
-    Navigator.pushNamedAndRemoveUntil(
-      context,
-      "/login",
-      (route) => false,
-    );
+    Navigator.pushNamedAndRemoveUntil(context, "/login", (route) => false);
   }
 }
 
@@ -398,70 +455,58 @@ class DashboardUI extends StatelessWidget {
     if (title == "Dashboard") {
       Navigator.push(
         context,
-        MaterialPageRoute(
-          builder: (_) => DashboardAnalyticsPage(role: role),
-        ),
+        MaterialPageRoute(builder: (_) => DashboardAnalyticsPage(role: role)),
       );
     } else if (title == "Business Setup") {
       Navigator.push(
         context,
-        MaterialPageRoute(
-          builder: (_) => BusinessSetupMenuPage(role: role),
-        ),
+        MaterialPageRoute(builder: (_) => BusinessSetupMenuPage(role: role)),
       );
     } else if (title == "Product") {
       Navigator.push(
         context,
-        MaterialPageRoute(
-          builder: (_) => ProductMenuPage(role: role),
-        ),
+        MaterialPageRoute(builder: (_) => ProductMenuPage(role: role)),
       );
     } else if (title == "Supplier") {
       Navigator.push(
         context,
-        MaterialPageRoute(
-          builder: (_) => SupplierMenuPage(role: role),
-        ),
+        MaterialPageRoute(builder: (_) => SupplierMenuPage(role: role)),
       );
     } else if (title == "Billing") {
       Navigator.push(
         context,
-        MaterialPageRoute(
-          builder: (_) => BillingMenuPage(role: role),
-        ),
+        MaterialPageRoute(builder: (_) => BillingMenuPage(role: role)),
       );
     } else if (title == "Reorder") {
       Navigator.push(
         context,
-        MaterialPageRoute(
-          builder: (_) => ReorderMenuPage(role: role),
-        ),
+        MaterialPageRoute(builder: (_) => ReorderMenuPage(role: role)),
       );
     } else if (title == "Sales") {
       Navigator.push(
         context,
-        MaterialPageRoute(
-          builder: (_) => SalesMenuPage(role: role),
-        ),
+        MaterialPageRoute(builder: (_) => SalesMenuPage(role: role)),
       );
     } else if (title == "Store") {
       Navigator.push(
         context,
-        MaterialPageRoute(
-          builder: (_) => StoreMenuPage(role: role),
-        ),
+        MaterialPageRoute(builder: (_) => StoreMenuPage(role: role)),
       );
     } else if (title == "Seller Update") {
       Navigator.push(
         context,
-        MaterialPageRoute(
-          builder: (_) => SellerUpdateMenuPage(role: role),
-        ),
+        MaterialPageRoute(builder: (_) => SellerUpdateMenuPage(role: role)),
       );
     }
   }
 
-  Widget buildCard(BuildContext context, String title, IconData iconData, Color iconColor, String role) {
+  Widget buildCard(
+    BuildContext context,
+    String title,
+    IconData iconData,
+    Color iconColor,
+    String role,
+  ) {
     return _buildModernModuleCard(
       context: context,
       title: title,
@@ -485,7 +530,10 @@ class DashboardUI extends StatelessWidget {
             const SizedBox(width: 8),
             Text(
               "Announcements",
-              style: GoogleFonts.inter(fontWeight: FontWeight.w800, fontSize: 18),
+              style: GoogleFonts.inter(
+                fontWeight: FontWeight.w800,
+                fontSize: 18,
+              ),
             ),
           ],
         ),
@@ -495,7 +543,10 @@ class DashboardUI extends StatelessWidget {
           children: [
             Text(
               "Latest System Updates",
-              style: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 14),
+              style: GoogleFonts.inter(
+                fontWeight: FontWeight.w600,
+                fontSize: 14,
+              ),
             ),
             const SizedBox(height: 8),
             Text(
@@ -513,14 +564,24 @@ class DashboardUI extends StatelessWidget {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text("Got it", style: TextStyle(color: Color(0xFF2563EB), fontWeight: FontWeight.bold)),
+            child: const Text(
+              "Got it",
+              style: TextStyle(
+                color: Color(0xFF2563EB),
+                fontWeight: FontWeight.bold,
+              ),
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildHeroBanner(BuildContext context, DashboardController controller, bool isDark) {
+  Widget _buildHeroBanner(
+    BuildContext context,
+    DashboardController controller,
+    bool isDark,
+  ) {
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
@@ -578,11 +639,16 @@ class DashboardUI extends StatelessWidget {
                   children: [
                     Flexible(
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 5,
+                        ),
                         decoration: BoxDecoration(
                           color: Colors.white.withOpacity(0.18),
                           borderRadius: BorderRadius.circular(20),
-                          border: Border.all(color: Colors.white.withOpacity(0.25)),
+                          border: Border.all(
+                            color: Colors.white.withOpacity(0.25),
+                          ),
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
@@ -597,17 +663,22 @@ class DashboardUI extends StatelessWidget {
                             ),
                             const SizedBox(width: 6),
                             Flexible(
-                              child: Obx(() => Text(
-                                controller.storeStatus.value.isNotEmpty ? controller.storeStatus.value.toUpperCase() : "ACTIVE POS",
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: GoogleFonts.inter(
-                                  color: Colors.white,
-                                  fontSize: 10.5,
-                                  fontWeight: FontWeight.w700,
-                                  letterSpacing: 0.5,
+                              child: Obx(
+                                () => Text(
+                                  controller.storeStatus.value.isNotEmpty
+                                      ? controller.storeStatus.value
+                                            .toUpperCase()
+                                      : "ACTIVE POS",
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: GoogleFonts.inter(
+                                    color: Colors.white,
+                                    fontSize: 10.5,
+                                    fontWeight: FontWeight.w700,
+                                    letterSpacing: 0.5,
+                                  ),
                                 ),
-                              )),
+                              ),
                             ),
                           ],
                         ),
@@ -618,16 +689,25 @@ class DashboardUI extends StatelessWidget {
                       onTap: () => showAnnouncementsDialog(context, isDark),
                       borderRadius: BorderRadius.circular(12),
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 5,
+                        ),
                         decoration: BoxDecoration(
                           color: Colors.white.withOpacity(0.15),
                           borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: Colors.white.withOpacity(0.25)),
+                          border: Border.all(
+                            color: Colors.white.withOpacity(0.25),
+                          ),
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            const Icon(Icons.campaign_outlined, color: Colors.white, size: 15),
+                            const Icon(
+                              Icons.campaign_outlined,
+                              color: Colors.white,
+                              size: 15,
+                            ),
                             const SizedBox(width: 4),
                             Text(
                               "Updates",
@@ -653,36 +733,48 @@ class DashboardUI extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 2),
-                Obx(() => Text(
-                  controller.businessName.value.isNotEmpty ? controller.businessName.value : "My Business",
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: GoogleFonts.inter(
-                    color: Colors.white,
-                    fontSize: 22,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: -0.5,
+                Obx(
+                  () => Text(
+                    controller.businessName.value.isNotEmpty
+                        ? controller.businessName.value
+                        : "My Business",
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.inter(
+                      color: Colors.white,
+                      fontSize: 22,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: -0.5,
+                    ),
                   ),
-                )),
+                ),
                 const SizedBox(height: 4),
-                Obx(() => Row(
-                  children: [
-                    Icon(Icons.storefront_outlined, size: 14, color: Colors.white.withOpacity(0.85)),
-                    const SizedBox(width: 5),
-                    Flexible(
-                      child: Text(
-                        controller.storeName.value.isNotEmpty ? controller.storeName.value : "Primary Store",
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: GoogleFonts.inter(
-                          color: Colors.white.withOpacity(0.92),
-                          fontSize: 12.5,
-                          fontWeight: FontWeight.w500,
+                Obx(
+                  () => Row(
+                    children: [
+                      Icon(
+                        Icons.storefront_outlined,
+                        size: 14,
+                        color: Colors.white.withOpacity(0.85),
+                      ),
+                      const SizedBox(width: 5),
+                      Flexible(
+                        child: Text(
+                          controller.storeName.value.isNotEmpty
+                              ? controller.storeName.value
+                              : "Primary Store",
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: GoogleFonts.inter(
+                            color: Colors.white.withOpacity(0.92),
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w500,
+                          ),
                         ),
                       ),
-                    ),
-                  ],
-                )),
+                    ],
+                  ),
+                ),
                 const SizedBox(height: 16),
                 Row(
                   children: [
@@ -694,7 +786,9 @@ class DashboardUI extends StatelessWidget {
                           onTap: () {
                             Navigator.push(
                               context,
-                              MaterialPageRoute(builder: (_) => CustomerScreen()),
+                              MaterialPageRoute(
+                                builder: (_) => CustomerScreen(),
+                              ),
                             );
                           },
                           borderRadius: BorderRadius.circular(14),
@@ -714,7 +808,11 @@ class DashboardUI extends StatelessWidget {
                             child: Row(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                const Icon(Icons.bolt_rounded, size: 18, color: Color(0xFF1E3A8A)),
+                                const Icon(
+                                  Icons.bolt_rounded,
+                                  size: 18,
+                                  color: Color(0xFF1E3A8A),
+                                ),
                                 const SizedBox(width: 6),
                                 Text(
                                   "New Bill",
@@ -739,7 +837,9 @@ class DashboardUI extends StatelessWidget {
                           onTap: () {
                             Navigator.push(
                               context,
-                              MaterialPageRoute(builder: (_) => const BillListScreen(token: '')),
+                              MaterialPageRoute(
+                                builder: (_) => const BillListScreen(token: ''),
+                              ),
                             );
                           },
                           borderRadius: BorderRadius.circular(14),
@@ -748,12 +848,19 @@ class DashboardUI extends StatelessWidget {
                             decoration: BoxDecoration(
                               color: Colors.white.withOpacity(0.12),
                               borderRadius: BorderRadius.circular(14),
-                              border: Border.all(color: Colors.white.withOpacity(0.4), width: 1.2),
+                              border: Border.all(
+                                color: Colors.white.withOpacity(0.4),
+                                width: 1.2,
+                              ),
                             ),
                             child: Row(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                const Icon(Icons.receipt_outlined, size: 16, color: Colors.white),
+                                const Icon(
+                                  Icons.receipt_outlined,
+                                  size: 16,
+                                  color: Colors.white,
+                                ),
                                 const SizedBox(width: 6),
                                 Text(
                                   "Invoices",
@@ -779,8 +886,16 @@ class DashboardUI extends StatelessWidget {
     );
   }
 
-  Widget _buildQuickMetrics(BuildContext context, DashboardController controller, bool isDark) {
-    final currencyFormat = NumberFormat.currency(locale: 'en_IN', symbol: '₹', decimalDigits: 0);
+  Widget _buildQuickMetrics(
+    BuildContext context,
+    DashboardController controller,
+    bool isDark,
+  ) {
+    final currencyFormat = NumberFormat.currency(
+      locale: 'en_IN',
+      symbol: '₹',
+      decimalDigits: 0,
+    );
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -805,7 +920,10 @@ class DashboardUI extends StatelessWidget {
               onTap: () {
                 Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (_) => DashboardAnalyticsPage(role: controller.role.value)),
+                  MaterialPageRoute(
+                    builder: (_) =>
+                        DashboardAnalyticsPage(role: controller.role.value),
+                  ),
                 );
               },
               borderRadius: BorderRadius.circular(8),
@@ -822,7 +940,11 @@ class DashboardUI extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(width: 2),
-                    const Icon(Icons.arrow_forward_ios_rounded, size: 12, color: Color(0xFF2563EB)),
+                    const Icon(
+                      Icons.arrow_forward_ios_rounded,
+                      size: 12,
+                      color: Color(0xFF2563EB),
+                    ),
                   ],
                 ),
               ),
@@ -847,7 +969,10 @@ class DashboardUI extends StatelessWidget {
               isDark: isDark,
               onTap: () => Navigator.push(
                 context,
-                MaterialPageRoute(builder: (_) => DashboardAnalyticsPage(role: controller.role.value)),
+                MaterialPageRoute(
+                  builder: (_) =>
+                      DashboardAnalyticsPage(role: controller.role.value),
+                ),
               ),
             ),
             _buildMetricTile(
@@ -859,7 +984,9 @@ class DashboardUI extends StatelessWidget {
               isDark: isDark,
               onTap: () => Navigator.push(
                 context,
-                MaterialPageRoute(builder: (_) => const BillListScreen(token: '')),
+                MaterialPageRoute(
+                  builder: (_) => const BillListScreen(token: ''),
+                ),
               ),
             ),
             _buildMetricTile(
@@ -871,7 +998,9 @@ class DashboardUI extends StatelessWidget {
               isDark: isDark,
               onTap: () => Navigator.push(
                 context,
-                MaterialPageRoute(builder: (_) => ProductMenuPage(role: controller.role.value)),
+                MaterialPageRoute(
+                  builder: (_) => ProductMenuPage(role: controller.role.value),
+                ),
               ),
             ),
             _buildMetricTile(
@@ -883,7 +1012,10 @@ class DashboardUI extends StatelessWidget {
               isDark: isDark,
               onTap: () => Navigator.push(
                 context,
-                MaterialPageRoute(builder: (_) => DashboardAnalyticsPage(role: controller.role.value)),
+                MaterialPageRoute(
+                  builder: (_) =>
+                      DashboardAnalyticsPage(role: controller.role.value),
+                ),
               ),
             ),
           ],
@@ -944,7 +1076,9 @@ class DashboardUI extends StatelessWidget {
                     style: GoogleFonts.inter(
                       fontSize: 11.5,
                       fontWeight: FontWeight.w600,
-                      color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                      color: isDark
+                          ? const Color(0xFF94A3B8)
+                          : const Color(0xFF64748B),
                     ),
                   ),
                 ),
@@ -968,7 +1102,11 @@ class DashboardUI extends StatelessWidget {
     );
   }
 
-  Widget _buildQuickShortcuts(BuildContext context, DashboardController controller, bool isDark) {
+  Widget _buildQuickShortcuts(
+    BuildContext context,
+    DashboardController controller,
+    bool isDark,
+  ) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -993,7 +1131,10 @@ class DashboardUI extends StatelessWidget {
                 icon: Icons.add_circle_outline_rounded,
                 color: const Color(0xFF10B981),
                 isDark: isDark,
-                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => CustomerScreen())),
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => CustomerScreen()),
+                ),
               ),
               const SizedBox(width: 10),
               _buildShortcutPill(
@@ -1002,7 +1143,12 @@ class DashboardUI extends StatelessWidget {
                 icon: Icons.description_outlined,
                 color: const Color(0xFF2563EB),
                 isDark: isDark,
-                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const BillListScreen(token: ''))),
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const BillListScreen(token: ''),
+                  ),
+                ),
               ),
               const SizedBox(width: 10),
               _buildShortcutPill(
@@ -1011,7 +1157,10 @@ class DashboardUI extends StatelessWidget {
                 icon: Icons.add_box_outlined,
                 color: const Color(0xFFF59E0B),
                 isDark: isDark,
-                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ProductEntryPage())),
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const ProductEntryPage()),
+                ),
               ),
               const SizedBox(width: 10),
               _buildShortcutPill(
@@ -1020,7 +1169,12 @@ class DashboardUI extends StatelessWidget {
                 icon: Icons.assignment_return_outlined,
                 color: const Color(0xFFEF4444),
                 isDark: isDark,
-                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CustomerReturnsScreen())),
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const CustomerReturnsScreen(),
+                  ),
+                ),
               ),
               const SizedBox(width: 10),
               _buildShortcutPill(
@@ -1029,7 +1183,10 @@ class DashboardUI extends StatelessWidget {
                 icon: Icons.people_outline_rounded,
                 color: const Color(0xFF8B5CF6),
                 isDark: isDark,
-                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SupplierListPage())),
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const SupplierListPage()),
+                ),
               ),
             ],
           ),
@@ -1095,7 +1252,11 @@ class DashboardUI extends StatelessWidget {
     );
   }
 
-  Widget _buildModulesSection(BuildContext context, String currentRole, bool isDark) {
+  Widget _buildModulesSection(
+    BuildContext context,
+    String currentRole,
+    bool isDark,
+  ) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1250,7 +1411,9 @@ class DashboardUI extends StatelessWidget {
                   Icon(
                     Icons.arrow_forward_rounded,
                     size: 16,
-                    color: isDark ? const Color(0xFF64748B) : const Color(0xFFCBD5E1),
+                    color: isDark
+                        ? const Color(0xFF64748B)
+                        : const Color(0xFFCBD5E1),
                   ),
                 ],
               ),
@@ -1275,7 +1438,9 @@ class DashboardUI extends StatelessWidget {
                     style: GoogleFonts.inter(
                       fontSize: 11,
                       fontWeight: FontWeight.w500,
-                      color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                      color: isDark
+                          ? const Color(0xFF94A3B8)
+                          : const Color(0xFF64748B),
                     ),
                   ),
                 ],
@@ -1287,7 +1452,11 @@ class DashboardUI extends StatelessWidget {
     );
   }
 
-  Widget _buildStoreFooter(BuildContext context, DashboardController controller, bool isDark) {
+  Widget _buildStoreFooter(
+    BuildContext context,
+    DashboardController controller,
+    bool isDark,
+  ) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(16),
@@ -1306,7 +1475,11 @@ class DashboardUI extends StatelessWidget {
               color: const Color(0xFF2563EB).withOpacity(0.1),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: const Icon(Icons.hub_outlined, color: Color(0xFF2563EB), size: 20),
+            child: const Icon(
+              Icons.hub_outlined,
+              color: Color(0xFF2563EB),
+              size: 20,
+            ),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -1316,16 +1489,22 @@ class DashboardUI extends StatelessWidget {
                 Row(
                   children: [
                     Flexible(
-                      child: Obx(() => Text(
-                        controller.storeName.value.isNotEmpty ? controller.storeName.value : "Default Outlet",
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: GoogleFonts.inter(
-                          fontSize: 13.5,
-                          fontWeight: FontWeight.w700,
-                          color: isDark ? Colors.white : const Color(0xFF0F172A),
+                      child: Obx(
+                        () => Text(
+                          controller.storeName.value.isNotEmpty
+                              ? controller.storeName.value
+                              : "Default Outlet",
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: GoogleFonts.inter(
+                            fontSize: 13.5,
+                            fontWeight: FontWeight.w700,
+                            color: isDark
+                                ? Colors.white
+                                : const Color(0xFF0F172A),
+                          ),
                         ),
-                      )),
+                      ),
                     ),
                     const SizedBox(width: 6),
                     Container(
@@ -1342,14 +1521,20 @@ class DashboardUI extends StatelessWidget {
                 Obx(() {
                   final phone = controller.storeMobile.value;
                   final addr = controller.storeAddress.value;
-                  final text = phone.isNotEmpty ? "Ph: $phone" : (addr.isNotEmpty ? addr : "System Online • Cloud Synced");
+                  final text = phone.isNotEmpty
+                      ? "Ph: $phone"
+                      : (addr.isNotEmpty
+                            ? addr
+                            : "System Online • Cloud Synced");
                   return Text(
                     text,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: GoogleFonts.inter(
                       fontSize: 11,
-                      color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                      color: isDark
+                          ? const Color(0xFF94A3B8)
+                          : const Color(0xFF64748B),
                     ),
                   );
                 }),
@@ -1374,7 +1559,9 @@ class DashboardUI extends StatelessWidget {
     final isDark = themeProvider.isDarkMode;
 
     return Scaffold(
-      backgroundColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+      backgroundColor: isDark
+          ? const Color(0xFF0F172A)
+          : const Color(0xFFF8FAFC),
       drawer: Obx(() {
         final dark = Theme.of(context).brightness == Brightness.dark;
         return Drawer(
@@ -1413,22 +1600,39 @@ class DashboardUI extends StatelessWidget {
                     ),
                     currentAccountPicture: CircleAvatar(
                       backgroundColor: Colors.white24,
-                      backgroundImage: controller.localAvatarPath.value.isNotEmpty && File(controller.localAvatarPath.value).existsSync()
-                          ? FileImage(File(controller.localAvatarPath.value)) as ImageProvider
+                      backgroundImage:
+                          controller.localAvatarPath.value.isNotEmpty &&
+                              File(
+                                controller.localAvatarPath.value,
+                              ).existsSync()
+                          ? FileImage(File(controller.localAvatarPath.value))
+                                as ImageProvider
                           : null,
                       child: controller.localAvatarPath.value.isEmpty
-                          ? const Icon(Icons.person, size: 40, color: Colors.white)
+                          ? const Icon(
+                              Icons.person,
+                              size: 40,
+                              color: Colors.white,
+                            )
                           : null,
                     ),
                     accountName: Text(
-                      controller.businessName.value.isNotEmpty ? controller.businessName.value : "My Business",
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                      controller.businessName.value.isNotEmpty
+                          ? controller.businessName.value
+                          : "My Business",
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
                     ),
                     accountEmail: Text(
-                      controller.storeName.value.isNotEmpty 
+                      controller.storeName.value.isNotEmpty
                           ? "${controller.storeName.value} • ${controller.role.value.toUpperCase()}"
                           : "Role: ${controller.role.value.toUpperCase()}",
-                      style: TextStyle(color: Colors.white.withOpacity(0.9), fontWeight: FontWeight.w500),
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.9),
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
                   ),
                 ),
@@ -1447,7 +1651,12 @@ class DashboardUI extends StatelessWidget {
                       title: const Text("General Settings"),
                       onTap: () {
                         Navigator.pop(context);
-                        Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsPage()));
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const SettingsPage(),
+                          ),
+                        );
                       },
                     ),
                     ListTile(
@@ -1455,7 +1664,12 @@ class DashboardUI extends StatelessWidget {
                       title: const Text("Manage"),
                       onTap: () {
                         Navigator.pop(context);
-                        Navigator.push(context, MaterialPageRoute(builder: (_) => const PinAuthGatePage()));
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const PinAuthGatePage(),
+                          ),
+                        );
                       },
                     ),
                   ],
@@ -1463,9 +1677,12 @@ class DashboardUI extends StatelessWidget {
                 const Divider(),
                 ListTile(
                   leading: const Icon(Icons.logout, color: Colors.redAccent),
-                  title: const Text("Logout", style: TextStyle(color: Colors.redAccent)),
+                  title: const Text(
+                    "Logout",
+                    style: TextStyle(color: Colors.redAccent),
+                  ),
                   onTap: () => controller.logout(context),
-                )
+                ),
               ],
             ),
           ),
@@ -1485,7 +1702,11 @@ class DashboardUI extends StatelessWidget {
                 color: const Color(0xFF6366F1).withOpacity(0.12),
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: const Icon(Icons.analytics_rounded, color: Color(0xFF6366F1), size: 18),
+              child: const Icon(
+                Icons.analytics_rounded,
+                color: Color(0xFF6366F1),
+                size: 18,
+              ),
             ),
             const SizedBox(width: 6),
             Flexible(
@@ -1520,11 +1741,16 @@ class DashboardUI extends StatelessWidget {
                       visualDensity: VisualDensity.compact,
                       padding: const EdgeInsets.all(4),
                       constraints: const BoxConstraints(),
-                      icon: const Icon(Icons.notifications_none_outlined, size: 20),
+                      icon: const Icon(
+                        Icons.notifications_none_outlined,
+                        size: 20,
+                      ),
                       onPressed: () {
                         Navigator.push(
                           context,
-                          MaterialPageRoute(builder: (_) => const NotificationsPage()),
+                          MaterialPageRoute(
+                            builder: (_) => const NotificationsPage(),
+                          ),
                         );
                       },
                     ),
@@ -1540,7 +1766,11 @@ class DashboardUI extends StatelessWidget {
                           ),
                           child: Text(
                             "$unread",
-                            style: const TextStyle(color: Colors.white, fontSize: 8, fontWeight: FontWeight.bold),
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 8,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                         ),
                       ),
@@ -1558,7 +1788,10 @@ class DashboardUI extends StatelessWidget {
                   color: isDark ? Colors.amber : const Color(0xFF1E293B),
                 ),
                 onPressed: () {
-                  final themeProv = provider_pkg.Provider.of<ThemeProvider>(context, listen: false);
+                  final themeProv = provider_pkg.Provider.of<ThemeProvider>(
+                    context,
+                    listen: false,
+                  );
                   themeProv.toggleTheme();
                   Get.changeThemeMode(themeProv.themeMode);
                 },
@@ -1569,13 +1802,18 @@ class DashboardUI extends StatelessWidget {
                 onTap: () => showProfileQuickActionsMenu(context, controller),
                 borderRadius: BorderRadius.circular(16),
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 4,
+                    vertical: 4,
+                  ),
                   child: CircleAvatar(
                     radius: 14,
                     backgroundColor: const Color(0xFF6366F1),
                     child: Obx(() {
                       final name = controller.businessName.value;
-                      final initial = name.trim().isNotEmpty ? name.trim()[0].toUpperCase() : "K";
+                      final initial = name.trim().isNotEmpty
+                          ? name.trim()[0].toUpperCase()
+                          : "K";
                       return Text(
                         initial,
                         style: GoogleFonts.inter(
@@ -1655,10 +1893,16 @@ class DashboardAnalyticsPage extends StatelessWidget {
     final controller = Get.find<DashboardController>();
     final themeProvider = provider_pkg.Provider.of<ThemeProvider>(context);
     final isDark = themeProvider.isDarkMode;
-    final currencyFormat = NumberFormat.currency(locale: 'en_IN', symbol: '₹', decimalDigits: 0);
+    final currencyFormat = NumberFormat.currency(
+      locale: 'en_IN',
+      symbol: '₹',
+      decimalDigits: 0,
+    );
 
     return Scaffold(
-      backgroundColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+      backgroundColor: isDark
+          ? const Color(0xFF0F172A)
+          : const Color(0xFFF8FAFC),
       appBar: AppBar(
         title: Text(
           "Dashboard",
@@ -1700,7 +1944,9 @@ class DashboardAnalyticsPage extends StatelessWidget {
               children: [
                 // 1. HERO GREETING BANNER
                 DashboardHeroBanner(
-                  userName: controller.businessName.value.isNotEmpty ? controller.businessName.value : "User",
+                  userName: controller.businessName.value.isNotEmpty
+                      ? controller.businessName.value
+                      : "User",
                   storeName: controller.storeName.value,
                   onAnnouncementsTap: () {
                     DashboardUI.showAnnouncementsDialog(context, isDark);
@@ -1723,42 +1969,58 @@ class DashboardAnalyticsPage extends StatelessWidget {
                       value: currencyFormat.format(controller.totalSales.value),
                       icon: Icons.arrow_outward_rounded,
                       iconColor: const Color(0xFF6366F1),
-                      iconBgColor: isDark ? const Color(0xFF312E81) : const Color(0xFFEEF2FF),
+                      iconBgColor: isDark
+                          ? const Color(0xFF312E81)
+                          : const Color(0xFFEEF2FF),
                     ),
                     DashboardStatCard(
                       title: "Total Profit",
-                      value: currencyFormat.format(controller.totalProfit.value),
+                      value: currencyFormat.format(
+                        controller.totalProfit.value,
+                      ),
                       icon: Icons.south_west_rounded,
                       iconColor: const Color(0xFF10B981),
-                      iconBgColor: isDark ? const Color(0xFF064E3B) : const Color(0xFFECFDF5),
+                      iconBgColor: isDark
+                          ? const Color(0xFF064E3B)
+                          : const Color(0xFFECFDF5),
                     ),
                     DashboardStatCard(
                       title: "Total Cost",
                       value: currencyFormat.format(controller.totalCost.value),
                       icon: Icons.south_west_rounded,
                       iconColor: const Color(0xFF0284C7),
-                      iconBgColor: isDark ? const Color(0xFF0C4A6E) : const Color(0xFFF0F9FF),
+                      iconBgColor: isDark
+                          ? const Color(0xFF0C4A6E)
+                          : const Color(0xFFF0F9FF),
                     ),
                     DashboardStatCard(
                       title: "Revenue",
                       value: currencyFormat.format(controller.revenue.value),
                       icon: Icons.arrow_outward_rounded,
                       iconColor: const Color(0xFF059669),
-                      iconBgColor: isDark ? const Color(0xFF064E3B) : const Color(0xFFECFDF5),
+                      iconBgColor: isDark
+                          ? const Color(0xFF064E3B)
+                          : const Color(0xFFECFDF5),
                     ),
                     DashboardStatCard(
                       title: "Products",
-                      value: NumberFormat.decimalPattern('en_IN').format(controller.productsCount.value),
+                      value: NumberFormat.decimalPattern(
+                        'en_IN',
+                      ).format(controller.productsCount.value),
                       icon: Icons.local_mall_outlined,
                       iconColor: const Color(0xFF8B5CF6),
-                      iconBgColor: isDark ? const Color(0xFF4C1D95) : const Color(0xFFF5F3FF),
+                      iconBgColor: isDark
+                          ? const Color(0xFF4C1D95)
+                          : const Color(0xFFF5F3FF),
                     ),
                     DashboardStatCard(
                       title: "Orders Served",
                       value: "${controller.ordersServedCount.value}",
                       icon: Icons.shopping_cart_outlined,
                       iconColor: const Color(0xFF06B6D4),
-                      iconBgColor: isDark ? const Color(0xFF164E63) : const Color(0xFFECFEFF),
+                      iconBgColor: isDark
+                          ? const Color(0xFF164E63)
+                          : const Color(0xFFECFEFF),
                     ),
                   ],
                 ),
@@ -1784,8 +2046,11 @@ class DashboardAnalyticsPage extends StatelessWidget {
                     Expanded(
                       child: DashboardBottomCard(
                         title: "Earnings",
-                        value: currencyFormat.format(controller.earningsAmount.value),
-                        subtitle: "${controller.completedSalesCount.value} Total Completed Sales",
+                        value: currencyFormat.format(
+                          controller.earningsAmount.value,
+                        ),
+                        subtitle:
+                            "${controller.completedSalesCount.value} Total Completed Sales",
                         subtitleColor: const Color(0xFF10B981),
                         period: controller.earningsPeriod.value,
                         onPeriodChanged: controller.changeEarningsPeriod,
@@ -1796,7 +2061,8 @@ class DashboardAnalyticsPage extends StatelessWidget {
                       child: DashboardBottomCard(
                         title: "Conversions",
                         value: "${controller.conversionsPercentage.value}%",
-                        subtitle: "${controller.purchaseOrdersCount.value} Purchase Orders Processed",
+                        subtitle:
+                            "${controller.purchaseOrdersCount.value} Purchase Orders Processed",
                         subtitleColor: const Color(0xFF2563EB),
                         period: controller.conversionsPeriod.value,
                         onPeriodChanged: controller.changeConversionsPeriod,
@@ -1819,197 +2085,13 @@ class BusinessSetupMenuPage extends StatelessWidget {
   final String role;
   const BusinessSetupMenuPage({super.key, required this.role});
 
-  Widget buildItem(BuildContext context, String title, Widget page, IconData icon, Color color) {
-    return Card(
-      elevation: 0,
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: Colors.grey.shade200),
-      ),
-      child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-        leading: Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: color.withOpacity(0.1),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Icon(icon, color: color),
-        ),
-        title: Text(
-          title,
-          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16)
-        ),
-        trailing: Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey.shade400),
-        onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => page),
-          );
-        },
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    bool isPropagator = role == "propagator" || role == "propagater" || role == "admin";
-
-    return Scaffold(
-      backgroundColor: const Color(0xFFF3F4F6),
-      appBar: AppBar(
-        title: const Text("Business Setup"),
-      ),
-      body: ListView(
-        padding: const EdgeInsets.only(top: 16, bottom: 20),
-        children: [
-          buildItem(context, "Setup Guide", const PlaceholderDetailPage(title: "Setup Guide"), Icons.help_outline, Colors.teal),
-        ],
-      ),
-    );
-  }
-}
-
-class ProductMenuPage extends StatelessWidget {
-  final String role;
-  const ProductMenuPage({super.key, required this.role});
-
-  Widget buildItem(BuildContext context, String title, Widget page, IconData icon, Color color) {
-    return Card(
-      elevation: 0,
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: Colors.grey.shade200),
-      ),
-      child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-        leading: Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: color.withOpacity(0.1),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Icon(icon, color: color),
-        ),
-        title: Text(
-          title, 
-          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16)
-        ),
-        trailing: Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey.shade400),
-        onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => page),
-          );
-        },
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF3F4F6),
-      appBar: AppBar(
-        title: const Text("Product Management"),
-      ),
-      body: ListView(
-        padding: const EdgeInsets.only(top: 16, bottom: 20),
-        children: [
-          buildItem(context, "Add Product", const ProductEntryPage(), Icons.add_box_outlined, Colors.blue),
-          buildItem(context, "Product List", const ProductAllocationPage(), Icons.format_list_bulleted, Colors.indigo),
-          buildItem(context, "Stock Entry", StockEntryPage(), Icons.input_outlined, Colors.teal),
-          buildItem(context, "Stock List", const StockListPage(), Icons.fact_check_outlined, Colors.green),
-          buildItem(context, "Stock Status", const StockStatusPage(), Icons.analytics_outlined, Colors.cyan),
-          buildItem(context, "Restock Requests", const RestockRequestsPage(), Icons.published_with_changes_outlined, Colors.deepOrange),
-          buildItem(context, "Storage", const StoragePage(), Icons.warehouse_outlined, Colors.blueGrey),
-          buildItem(context, "Storage Allocation", const StorageAllocationPage(), Icons.hub_outlined, Colors.indigo),
-        ],
-      ),
-    );
-  }
-}
-
-class SupplierMenuController extends GetxController {
-  var token = "".obs;
-
-  @override
-  void onInit() {
-    super.onInit();
-    loadToken();
-  }
-
-  Future<void> loadToken() async {
-    final prefs = await SharedPreferences.getInstance();
-    token.value = prefs.getString("billing_auth_token") ?? prefs.getString("auth_token") ?? prefs.getString("token") ?? "";
-  }
-}
-
-class SupplierMenuPage extends StatelessWidget {
-  final String role;
-  const SupplierMenuPage({super.key, required this.role});
-
-  Widget buildItem(BuildContext context, String title, Widget page, IconData icon, Color color) {
-    return Card(
-      elevation: 0,
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: Colors.grey.shade200),
-      ),
-      child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-        leading: Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: color.withOpacity(0.1),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Icon(icon, color: color),
-        ),
-        title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16)),
-        trailing: Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey.shade400),
-        onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => page),
-          );
-        },
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final controller = Get.put(SupplierMenuController());
-
-    return Scaffold(
-      backgroundColor: const Color(0xFFF3F4F6),
-      appBar: AppBar(title: const Text("Supplier Management")),
-      body: Obx(() {
-        final currentToken = controller.token.value;
-        return ListView(
-          padding: const EdgeInsets.only(top: 16, bottom: 20),
-          children: [
-            buildItem(context, "View Suppliers", const SupplierListPage(), Icons.people_alt_outlined, Colors.blue),
-            buildItem(context, "Supplier Product & Category", SupplierProductsPage(token: currentToken), Icons.category_outlined, Colors.orange),
-            buildItem(context, "Create Services", CreateSupplierServicePage(token: currentToken), Icons.design_services_outlined, Colors.teal),
-            buildItem(context, "List Services", ListServiceManagementPage(token: currentToken), Icons.format_list_bulleted_outlined, Colors.indigo),
-            buildItem(context, "Quotations", SupplierQuotationPage(token: currentToken), Icons.request_quote_outlined, Colors.purple),
-          ],
-        );
-      }),
-    );
-  }
-}
-
-class ReorderMenuPage extends StatelessWidget {
-  final String role;
-  const ReorderMenuPage({super.key, required this.role});
-
-  Widget buildItem(BuildContext context, String title, Widget page, IconData icon, Color color) {
+  Widget buildItem(
+    BuildContext context,
+    String title,
+    Widget page,
+    IconData icon,
+    Color color,
+  ) {
     return Card(
       elevation: 0,
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -2031,12 +2113,13 @@ class ReorderMenuPage extends StatelessWidget {
           title,
           style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
         ),
-        trailing: Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey.shade400),
+        trailing: Icon(
+          Icons.arrow_forward_ios,
+          size: 16,
+          color: Colors.grey.shade400,
+        ),
         onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => page),
-          );
+          Navigator.push(context, MaterialPageRoute(builder: (_) => page));
         },
       ),
     );
@@ -2044,233 +2127,39 @@ class ReorderMenuPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final controller = Get.put(SupplierMenuController());
+    bool isPropagator =
+        role == "propagator" || role == "propagater" || role == "admin";
 
     return Scaffold(
       backgroundColor: const Color(0xFFF3F4F6),
-      appBar: AppBar(
-        title: const Text("Reorder"),
+      appBar: AppBar(title: const Text("Business Setup")),
+      body: ListView(
+        padding: const EdgeInsets.only(top: 16, bottom: 20),
+        children: [
+          buildItem(
+            context,
+            "Setup Guide",
+            const PlaceholderDetailPage(title: "Setup Guide"),
+            Icons.help_outline,
+            Colors.teal,
+          ),
+        ],
       ),
-      body: Obx(() {
-        final currentToken = controller.token.value;
-        return ListView(
-          padding: const EdgeInsets.only(top: 16, bottom: 20),
-          children: [
-            buildItem(context, "Reorders", CreatePurchaseOrderPage(token: currentToken), Icons.sync_alt, Colors.blue),
-            buildItem(context, "Reorders list", SupplierOrdersPage(token: currentToken), Icons.format_list_bulleted, Colors.orange),
-            buildItem(context, "Supplier bill", const PurchaseListPage(), Icons.receipt_long, Colors.purple),
-          ],
-        );
-      }),
     );
   }
 }
 
-class BillingMenuPage extends StatelessWidget {
+class ProductMenuPage extends StatelessWidget {
   final String role;
-  const BillingMenuPage({super.key, required this.role});
+  const ProductMenuPage({super.key, required this.role});
 
   Widget buildItem(
-      BuildContext context, String title, IconData icon, Widget page, Color color) {
-    return Card(
-      elevation: 0,
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: Colors.grey.shade200),
-      ),
-      child: ListTile(
-        leading: Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: color.withOpacity(0.1),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Icon(icon, color: color),
-        ),
-        title: Text(title,
-            style: const TextStyle(fontWeight: FontWeight.w600)),
-        trailing:
-        Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey.shade400),
-        onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => page),
-          );
-        },
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF3F4F6),
-      appBar: AppBar(title: const Text("Billing")),
-      body: ListView(
-        padding: const EdgeInsets.only(top: 16, bottom: 20),
-        children: [
-          buildItem(context, "Generate Bill", Icons.point_of_sale, CustomerScreen(), Colors.blue),
-          buildItem(context, "Invoices", Icons.description_outlined, const BillListScreen(token: ''), Colors.green),
-          buildItem(context, "Returns", Icons.assignment_return_outlined, const CustomerReturnsScreen(), Colors.deepOrange),
-        ],
-      ),
-    );
-  }
-}
-
-class PlaceholderDetailPage extends StatelessWidget {
-  final String title;
-  const PlaceholderDetailPage({super.key, required this.title});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(title),
-      ),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.layers_outlined, size: 64, color: Colors.grey.shade400),
-            const SizedBox(height: 16),
-            Text(
-              "$title Screen",
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.grey.shade700),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              "Feature coming soon",
-              style: TextStyle(color: Colors.grey.shade500),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class StoreMenuPage extends StatelessWidget {
-  final String role;
-  const StoreMenuPage({super.key, required this.role});
-
-  Widget buildItem(BuildContext context, String title, Widget page, IconData icon, Color color) {
-    return Card(
-      elevation: 0,
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: Colors.grey.shade200),
-      ),
-      child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-        leading: Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: color.withOpacity(0.1),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Icon(icon, color: color),
-        ),
-        title: Text(
-            title,
-            style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16)
-        ),
-        trailing: Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey.shade400),
-        onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => page),
-          );
-        },
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF3F4F6),
-      appBar: AppBar(
-        title: const Text("Store Management"),
-      ),
-      body: ListView(
-        padding: const EdgeInsets.only(top: 16, bottom: 20),
-        children: [
-          buildItem(context, "Create Store", const RegisteredStorefrontsPage(), Icons.add_business, Colors.blue),
-          buildItem(context, "Dynamic Selection", const DynamicSelectionPage(), Icons.dynamic_feed, Colors.orange),
-        ],
-      ),
-    );
-  }
-}
-
-class SellerUpdateMenuPage extends StatelessWidget {
-  final String role;
-  const SellerUpdateMenuPage({super.key, required this.role});
-
-  Widget buildItem(BuildContext context, String title, Widget page, IconData icon, Color color) {
-    return Card(
-      elevation: 0,
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: Colors.grey.shade200),
-      ),
-      child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-        leading: Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: color.withOpacity(0.1),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Icon(icon, color: color),
-        ),
-        title: Text(
-            title,
-            style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16)
-        ),
-        trailing: Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey.shade400),
-        onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => page),
-          );
-        },
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF3F4F6),
-      appBar: AppBar(
-        title: const Text("Seller Update"),
-      ),
-      body: ListView(
-        padding: const EdgeInsets.only(top: 16, bottom: 20),
-        children: [
-          buildItem(context, "Purchase Charge", const PurchaseChargesPage(), Icons.payment, Colors.blue),
-          buildItem(context, "Purchase List", const PurchaseChargesListPage(), Icons.list_alt, Colors.orange),
-          buildItem(context, "Pricing & Offers", const PricingOffersPage(), Icons.local_offer, Colors.purple),
-          buildItem(context, "Seller Update", const SellerUpdatePage(), Icons.update, Colors.green),
-          buildItem(context, "Delivery Charges", const DeliveryChargesPage(), Icons.local_shipping, Colors.teal),
-          buildItem(context, "Terms & Conditions", const PlaceholderDetailPage(title: "Terms & Conditions"), Icons.article_outlined, Colors.indigo),
-          buildItem(context, "Warranty & Guarantee", const PlaceholderDetailPage(title: "Warranty & Guarantee"), Icons.verified_user_outlined, Colors.deepOrange),
-        ],
-      ),
-    );
-  }
-}
-
-class SalesMenuPage extends StatelessWidget {
-  final String role;
-  const SalesMenuPage({super.key, required this.role});
-
-  Widget buildItem(BuildContext context, String title, Widget page, IconData icon, Color color) {
+    BuildContext context,
+    String title,
+    Widget page,
+    IconData icon,
+    Color color,
+  ) {
     return Card(
       elevation: 0,
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -2290,14 +2179,15 @@ class SalesMenuPage extends StatelessWidget {
         ),
         title: Text(
           title,
-          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16)
+          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
         ),
-        trailing: Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey.shade400),
+        trailing: Icon(
+          Icons.arrow_forward_ios,
+          size: 16,
+          color: Colors.grey.shade400,
+        ),
         onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => page),
-          );
+          Navigator.push(context, MaterialPageRoute(builder: (_) => page));
         },
       ),
     );
@@ -2307,13 +2197,620 @@ class SalesMenuPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF3F4F6),
-      appBar: AppBar(
-        title: const Text("Sales"),
-      ),
+      appBar: AppBar(title: const Text("Product Management")),
       body: ListView(
         padding: const EdgeInsets.only(top: 16, bottom: 20),
         children: [
-          buildItem(context, "Sales Point", const SalesPointPage(), Icons.shopping_cart_outlined, Colors.red),
+          buildItem(
+            context,
+            "Add Product",
+            const ProductEntryPage(),
+            Icons.add_box_outlined,
+            Colors.blue,
+          ),
+          buildItem(
+            context,
+            "Product List",
+            const ProductAllocationPage(),
+            Icons.format_list_bulleted,
+            Colors.indigo,
+          ),
+          buildItem(
+            context,
+            "Stock Entry",
+            StockEntryPage(),
+            Icons.input_outlined,
+            Colors.teal,
+          ),
+          buildItem(
+            context,
+            "Stock List",
+            const StockListPage(),
+            Icons.fact_check_outlined,
+            Colors.green,
+          ),
+          buildItem(
+            context,
+            "Stock Status",
+            const StockStatusPage(),
+            Icons.analytics_outlined,
+            Colors.cyan,
+          ),
+          buildItem(
+            context,
+            "Restock Requests",
+            const RestockRequestsPage(),
+            Icons.published_with_changes_outlined,
+            Colors.deepOrange,
+          ),
+          buildItem(
+            context,
+            "Storage",
+            const StoragePage(),
+            Icons.warehouse_outlined,
+            Colors.blueGrey,
+          ),
+          buildItem(
+            context,
+            "Storage Allocation",
+            const StorageAllocationPage(),
+            Icons.hub_outlined,
+            Colors.indigo,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class SupplierMenuController extends GetxController {
+  var token = "".obs;
+
+  @override
+  void onInit() {
+    super.onInit();
+    loadToken();
+  }
+
+  Future<void> loadToken() async {
+    final prefs = await SharedPreferences.getInstance();
+    token.value =
+        prefs.getString("billing_auth_token") ??
+        prefs.getString("auth_token") ??
+        prefs.getString("token") ??
+        "";
+  }
+}
+
+class SupplierMenuPage extends StatelessWidget {
+  final String role;
+  const SupplierMenuPage({super.key, required this.role});
+
+  Widget buildItem(
+    BuildContext context,
+    String title,
+    Widget page,
+    IconData icon,
+    Color color,
+  ) {
+    return Card(
+      elevation: 0,
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: Colors.grey.shade200),
+      ),
+      child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+        leading: Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Icon(icon, color: color),
+        ),
+        title: Text(
+          title,
+          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
+        ),
+        trailing: Icon(
+          Icons.arrow_forward_ios,
+          size: 16,
+          color: Colors.grey.shade400,
+        ),
+        onTap: () {
+          Navigator.push(context, MaterialPageRoute(builder: (_) => page));
+        },
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final controller = Get.put(SupplierMenuController());
+
+    return Scaffold(
+      backgroundColor: const Color(0xFFF3F4F6),
+      appBar: AppBar(title: const Text("Supplier Management")),
+      body: Obx(() {
+        final currentToken = controller.token.value;
+        return ListView(
+          padding: const EdgeInsets.only(top: 16, bottom: 20),
+          children: [
+            buildItem(
+              context,
+              "View Suppliers",
+              const SupplierListPage(),
+              Icons.people_alt_outlined,
+              Colors.blue,
+            ),
+            buildItem(
+              context,
+              "Supplier Product & Category",
+              SupplierProductsPage(token: currentToken),
+              Icons.category_outlined,
+              Colors.orange,
+            ),
+            buildItem(
+              context,
+              "Create Services",
+              CreateSupplierServicePage(token: currentToken),
+              Icons.design_services_outlined,
+              Colors.teal,
+            ),
+            buildItem(
+              context,
+              "List Services",
+              ListServiceManagementPage(token: currentToken),
+              Icons.format_list_bulleted_outlined,
+              Colors.indigo,
+            ),
+            buildItem(
+              context,
+              "Quotations",
+              SupplierQuotationPage(token: currentToken),
+              Icons.request_quote_outlined,
+              Colors.purple,
+            ),
+          ],
+        );
+      }),
+    );
+  }
+}
+
+class ReorderMenuPage extends StatelessWidget {
+  final String role;
+  const ReorderMenuPage({super.key, required this.role});
+
+  Widget buildItem(
+    BuildContext context,
+    String title,
+    Widget page,
+    IconData icon,
+    Color color,
+  ) {
+    return Card(
+      elevation: 0,
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: Colors.grey.shade200),
+      ),
+      child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+        leading: Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Icon(icon, color: color),
+        ),
+        title: Text(
+          title,
+          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
+        ),
+        trailing: Icon(
+          Icons.arrow_forward_ios,
+          size: 16,
+          color: Colors.grey.shade400,
+        ),
+        onTap: () {
+          Navigator.push(context, MaterialPageRoute(builder: (_) => page));
+        },
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final controller = Get.put(SupplierMenuController());
+
+    return Scaffold(
+      backgroundColor: const Color(0xFFF3F4F6),
+      appBar: AppBar(title: const Text("Reorder")),
+      body: Obx(() {
+        final currentToken = controller.token.value;
+        return ListView(
+          padding: const EdgeInsets.only(top: 16, bottom: 20),
+          children: [
+            buildItem(
+              context,
+              "Reorders",
+              CreatePurchaseOrderPage(token: currentToken),
+              Icons.sync_alt,
+              Colors.blue,
+            ),
+            buildItem(
+              context,
+              "Reorders list",
+              SupplierOrdersPage(token: currentToken),
+              Icons.format_list_bulleted,
+              Colors.orange,
+            ),
+            buildItem(
+              context,
+              "Supplier bill",
+              const PurchaseListPage(),
+              Icons.receipt_long,
+              Colors.purple,
+            ),
+          ],
+        );
+      }),
+    );
+  }
+}
+
+class BillingMenuPage extends StatelessWidget {
+  final String role;
+  const BillingMenuPage({super.key, required this.role});
+
+  Widget buildItem(
+    BuildContext context,
+    String title,
+    IconData icon,
+    Widget page,
+    Color color,
+  ) {
+    return Card(
+      elevation: 0,
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: Colors.grey.shade200),
+      ),
+      child: ListTile(
+        leading: Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Icon(icon, color: color),
+        ),
+        title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
+        trailing: Icon(
+          Icons.arrow_forward_ios,
+          size: 16,
+          color: Colors.grey.shade400,
+        ),
+        onTap: () {
+          Navigator.push(context, MaterialPageRoute(builder: (_) => page));
+        },
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFFF3F4F6),
+      appBar: AppBar(title: const Text("Billing")),
+      body: ListView(
+        padding: const EdgeInsets.only(top: 16, bottom: 20),
+        children: [
+          buildItem(
+            context,
+            "Generate Bill",
+            Icons.point_of_sale,
+            CustomerScreen(),
+            Colors.blue,
+          ),
+          buildItem(
+            context,
+            "Invoices",
+            Icons.description_outlined,
+            const BillListScreen(token: ''),
+            Colors.green,
+          ),
+          buildItem(
+            context,
+            "Returns",
+            Icons.assignment_return_outlined,
+            const CustomerReturnsScreen(),
+            Colors.deepOrange,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class PlaceholderDetailPage extends StatelessWidget {
+  final String title;
+  const PlaceholderDetailPage({super.key, required this.title});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: Text(title)),
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.layers_outlined, size: 64, color: Colors.grey.shade400),
+            const SizedBox(height: 16),
+            Text(
+              "$title Screen",
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: Colors.grey.shade700,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              "Feature coming soon",
+              style: TextStyle(color: Colors.grey.shade500),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class StoreMenuPage extends StatelessWidget {
+  final String role;
+  const StoreMenuPage({super.key, required this.role});
+
+  Widget buildItem(
+    BuildContext context,
+    String title,
+    Widget page,
+    IconData icon,
+    Color color,
+  ) {
+    return Card(
+      elevation: 0,
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: Colors.grey.shade200),
+      ),
+      child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+        leading: Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Icon(icon, color: color),
+        ),
+        title: Text(
+          title,
+          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
+        ),
+        trailing: Icon(
+          Icons.arrow_forward_ios,
+          size: 16,
+          color: Colors.grey.shade400,
+        ),
+        onTap: () {
+          Navigator.push(context, MaterialPageRoute(builder: (_) => page));
+        },
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFFF3F4F6),
+      appBar: AppBar(title: const Text("Store Management")),
+      body: ListView(
+        padding: const EdgeInsets.only(top: 16, bottom: 20),
+        children: [
+          buildItem(
+            context,
+            "Create Store",
+            const RegisteredStorefrontsPage(),
+            Icons.add_business,
+            Colors.blue,
+          ),
+          buildItem(
+            context,
+            "Dynamic Selection",
+            const DynamicSelectionPage(),
+            Icons.dynamic_feed,
+            Colors.orange,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class SellerUpdateMenuPage extends StatelessWidget {
+  final String role;
+  const SellerUpdateMenuPage({super.key, required this.role});
+
+  Widget buildItem(
+    BuildContext context,
+    String title,
+    Widget page,
+    IconData icon,
+    Color color,
+  ) {
+    return Card(
+      elevation: 0,
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: Colors.grey.shade200),
+      ),
+      child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+        leading: Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Icon(icon, color: color),
+        ),
+        title: Text(
+          title,
+          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
+        ),
+        trailing: Icon(
+          Icons.arrow_forward_ios,
+          size: 16,
+          color: Colors.grey.shade400,
+        ),
+        onTap: () {
+          Navigator.push(context, MaterialPageRoute(builder: (_) => page));
+        },
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFFF3F4F6),
+      appBar: AppBar(title: const Text("Seller Update")),
+      body: ListView(
+        padding: const EdgeInsets.only(top: 16, bottom: 20),
+        children: [
+          buildItem(
+            context,
+            "Purchase Charge",
+            const PurchaseChargesPage(),
+            Icons.payment,
+            Colors.blue,
+          ),
+          buildItem(
+            context,
+            "Purchase List",
+            const PurchaseChargesListPage(),
+            Icons.list_alt,
+            Colors.orange,
+          ),
+          buildItem(
+            context,
+            "Pricing & Offers",
+            const PricingOffersPage(),
+            Icons.local_offer,
+            Colors.purple,
+          ),
+          buildItem(
+            context,
+            "Seller Update",
+            const SellerUpdatePage(),
+            Icons.update,
+            Colors.green,
+          ),
+          buildItem(
+            context,
+            "Delivery Charges",
+            const DeliveryChargesPage(),
+            Icons.local_shipping,
+            Colors.teal,
+          ),
+          buildItem(
+            context,
+            "Terms & Conditions",
+            const PlaceholderDetailPage(title: "Terms & Conditions"),
+            Icons.article_outlined,
+            Colors.indigo,
+          ),
+          buildItem(
+            context,
+            "Warranty & Guarantee",
+            const PlaceholderDetailPage(title: "Warranty & Guarantee"),
+            Icons.verified_user_outlined,
+            Colors.deepOrange,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class SalesMenuPage extends StatelessWidget {
+  final String role;
+  const SalesMenuPage({super.key, required this.role});
+
+  Widget buildItem(
+    BuildContext context,
+    String title,
+    Widget page,
+    IconData icon,
+    Color color,
+  ) {
+    return Card(
+      elevation: 0,
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: Colors.grey.shade200),
+      ),
+      child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+        leading: Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Icon(icon, color: color),
+        ),
+        title: Text(
+          title,
+          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
+        ),
+        trailing: Icon(
+          Icons.arrow_forward_ios,
+          size: 16,
+          color: Colors.grey.shade400,
+        ),
+        onTap: () {
+          Navigator.push(context, MaterialPageRoute(builder: (_) => page));
+        },
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFFF3F4F6),
+      appBar: AppBar(title: const Text("Sales")),
+      body: ListView(
+        padding: const EdgeInsets.only(top: 16, bottom: 20),
+        children: [
+          buildItem(
+            context,
+            "Sales Point",
+            const SalesPointPage(),
+            Icons.shopping_cart_outlined,
+            Colors.red,
+          ),
         ],
       ),
     );
@@ -2339,7 +2836,8 @@ class _NotificationsPageState extends State<NotificationsPage> {
     {
       "id": 1,
       "title": "Low Stock Warning",
-      "message": "Product 'Premium Wireless Earbuds' is below the safety threshold of 15 units. Current stock: 4.",
+      "message":
+          "Product 'Premium Wireless Earbuds' is below the safety threshold of 15 units. Current stock: 4.",
       "type": "Stock Alerts",
       "priority": "High",
       "timestamp": "10 mins ago",
@@ -2348,7 +2846,8 @@ class _NotificationsPageState extends State<NotificationsPage> {
     {
       "id": 2,
       "title": "Sales Invoice Generated",
-      "message": "Invoice #INV-2026-0043 of amount \$349.99 was successfully generated and sent to customer.",
+      "message":
+          "Invoice #INV-2026-0043 of amount \$349.99 was successfully generated and sent to customer.",
       "type": "Billing Updates",
       "priority": "Normal",
       "timestamp": "1 hr ago",
@@ -2357,7 +2856,8 @@ class _NotificationsPageState extends State<NotificationsPage> {
     {
       "id": 3,
       "title": "Purchase Order Pending Approval",
-      "message": "Purchase bill #PO-8874 requires supervisor approval before release to supplier.",
+      "message":
+          "Purchase bill #PO-8874 requires supervisor approval before release to supplier.",
       "type": "Billing Updates",
       "priority": "High",
       "timestamp": "3 hrs ago",
@@ -2366,7 +2866,8 @@ class _NotificationsPageState extends State<NotificationsPage> {
     {
       "id": 4,
       "title": "Database Backup Completed",
-      "message": "Daily automated backup of sales databases has completed successfully. Size: 48 MB.",
+      "message":
+          "Daily automated backup of sales databases has completed successfully. Size: 48 MB.",
       "type": "System",
       "priority": "Normal",
       "timestamp": "1 day ago",
@@ -2375,7 +2876,8 @@ class _NotificationsPageState extends State<NotificationsPage> {
     {
       "id": 5,
       "title": "New Supplier Quotation",
-      "message": "Supplier 'Tech Gadgets Ltd' submitted a new quotation for component RF-21.",
+      "message":
+          "Supplier 'Tech Gadgets Ltd' submitted a new quotation for component RF-21.",
       "type": "Stock Alerts",
       "priority": "Normal",
       "timestamp": "2 days ago",
@@ -2440,7 +2942,9 @@ class _NotificationsPageState extends State<NotificationsPage> {
     } else if (currentTab == "Billing Updates") {
       result = result.where((n) {
         final type = (n['type'] ?? '').toString().toLowerCase();
-        return type.contains('bill') || type.contains('invoice') || type.contains('payment');
+        return type.contains('bill') ||
+            type.contains('invoice') ||
+            type.contains('payment');
       }).toList();
     }
 
@@ -2463,7 +2967,9 @@ class _NotificationsPageState extends State<NotificationsPage> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text("Clear All Notifications?"),
-        content: const Text("Are you sure you want to dismiss all current alerts?"),
+        content: const Text(
+          "Are you sure you want to dismiss all current alerts?",
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
@@ -2483,8 +2989,11 @@ class _NotificationsPageState extends State<NotificationsPage> {
               });
             },
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            child: const Text("Clear All", style: TextStyle(color: Colors.white)),
-          )
+            child: const Text(
+              "Clear All",
+              style: TextStyle(color: Colors.white),
+            ),
+          ),
         ],
       ),
     );
@@ -2504,8 +3013,8 @@ class _NotificationsPageState extends State<NotificationsPage> {
         margin: const EdgeInsets.only(right: 8),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         decoration: BoxDecoration(
-          color: isActive 
-              ? const Color(0xFF2563EB).withOpacity(0.1) 
+          color: isActive
+              ? const Color(0xFF2563EB).withOpacity(0.1)
               : (isDark ? Colors.white10 : Colors.grey.shade100),
           border: Border.all(
             color: isActive ? const Color(0xFF2563EB) : Colors.transparent,
@@ -2517,8 +3026,8 @@ class _NotificationsPageState extends State<NotificationsPage> {
           "$label$countStr",
           style: TextStyle(
             fontWeight: FontWeight.bold,
-            color: isActive 
-                ? const Color(0xFF2563EB) 
+            color: isActive
+                ? const Color(0xFF2563EB)
                 : (isDark ? Colors.white70 : Colors.grey.shade700),
             fontSize: 13,
           ),
@@ -2547,17 +3056,17 @@ class _NotificationsPageState extends State<NotificationsPage> {
 
     final billingCount = serverNotifications.where((n) {
       final type = (n['type'] ?? '').toString().toLowerCase();
-      return type.contains('bill') || type.contains('invoice') || type.contains('payment');
+      return type.contains('bill') ||
+          type.contains('invoice') ||
+          type.contains('payment');
     }).length;
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text("Notifications"),
-      ),
+      appBar: AppBar(title: const Text("Notifications")),
       body: Container(
         decoration: BoxDecoration(
           gradient: LinearGradient(
-            colors: isDark 
+            colors: isDark
                 ? [const Color(0xFF0F172A), const Color(0xFF1E293B)]
                 : [const Color(0xFFF8FAFC), const Color(0xFFE2E8F0)],
             begin: Alignment.topCenter,
@@ -2581,8 +3090,8 @@ class _NotificationsPageState extends State<NotificationsPage> {
                         border: Border.all(color: const Color(0xFFDBEAFE)),
                       ),
                       child: const Icon(
-                        Icons.notifications_active_outlined, 
-                        color: Color(0xFF2563EB), 
+                        Icons.notifications_active_outlined,
+                        color: Color(0xFF2563EB),
                         size: 28,
                       ),
                     ),
@@ -2596,7 +3105,9 @@ class _NotificationsPageState extends State<NotificationsPage> {
                             style: TextStyle(
                               fontSize: 22,
                               fontWeight: FontWeight.bold,
-                              color: isDark ? Colors.white : const Color(0xFF0F172A),
+                              color: isDark
+                                  ? Colors.white
+                                  : const Color(0xFF0F172A),
                             ),
                           ),
                           const SizedBox(height: 4),
@@ -2604,7 +3115,9 @@ class _NotificationsPageState extends State<NotificationsPage> {
                             "System alerts for Sales, Purchase bills, and Stock warnings (${serverNotifications.length} Total)",
                             style: TextStyle(
                               fontSize: 13,
-                              color: isDark ? Colors.white70 : Colors.grey.shade600,
+                              color: isDark
+                                  ? Colors.white70
+                                  : Colors.grey.shade600,
                             ),
                           ),
                         ],
@@ -2622,22 +3135,38 @@ class _NotificationsPageState extends State<NotificationsPage> {
                   children: [
                     ElevatedButton.icon(
                       onPressed: loadData,
-                      icon: const Icon(Icons.sync, size: 16, color: Colors.blueAccent),
-                      label: const Text("Refresh", style: TextStyle(color: Colors.blueAccent)),
+                      icon: const Icon(
+                        Icons.sync,
+                        size: 16,
+                        color: Colors.blueAccent,
+                      ),
+                      label: const Text(
+                        "Refresh",
+                        style: TextStyle(color: Colors.blueAccent),
+                      ),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.white,
                         elevation: 0,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(8),
-                          side: BorderSide(color: Colors.blueAccent.withOpacity(0.3)),
+                          side: BorderSide(
+                            color: Colors.blueAccent.withOpacity(0.3),
+                          ),
                         ),
                       ),
                     ),
                     const SizedBox(width: 12),
                     ElevatedButton.icon(
                       onPressed: clearAll,
-                      icon: const Icon(Icons.delete_outline, size: 16, color: Colors.redAccent),
-                      label: const Text("Clear All", style: TextStyle(color: Colors.redAccent)),
+                      icon: const Icon(
+                        Icons.delete_outline,
+                        size: 16,
+                        color: Colors.redAccent,
+                      ),
+                      label: const Text(
+                        "Clear All",
+                        style: TextStyle(color: Colors.redAccent),
+                      ),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFFFEF2F2),
                         elevation: 0,
@@ -2657,21 +3186,30 @@ class _NotificationsPageState extends State<NotificationsPage> {
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20.0),
                 child: TextField(
-                  style: TextStyle(color: isDark ? Colors.white : Colors.black87),
+                  style: TextStyle(
+                    color: isDark ? Colors.white : Colors.black87,
+                  ),
                   decoration: InputDecoration(
                     prefixIcon: const Icon(Icons.search, color: Colors.grey),
                     hintText: "Search by title, message, stock status...",
                     hintStyle: const TextStyle(color: Colors.grey),
                     filled: true,
                     fillColor: isDark ? Colors.white10 : Colors.white,
-                    contentPadding: const EdgeInsets.symmetric(vertical: 0, horizontal: 16),
+                    contentPadding: const EdgeInsets.symmetric(
+                      vertical: 0,
+                      horizontal: 16,
+                    ),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: isDark ? Colors.white24 : Colors.grey.shade200),
+                      borderSide: BorderSide(
+                        color: isDark ? Colors.white24 : Colors.grey.shade200,
+                      ),
                     ),
                     enabledBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: isDark ? Colors.white12 : Colors.grey.shade200),
+                      borderSide: BorderSide(
+                        color: isDark ? Colors.white12 : Colors.grey.shade200,
+                      ),
                     ),
                   ),
                   onChanged: (val) {
@@ -2704,23 +3242,35 @@ class _NotificationsPageState extends State<NotificationsPage> {
               // Show User Permissions list as a subtle indicator
               if (userPermissions.isNotEmpty)
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20.0,
+                    vertical: 4,
+                  ),
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 6,
+                    ),
                     decoration: BoxDecoration(
                       color: Colors.blue.withOpacity(0.08),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Row(
                       children: [
-                        const Icon(Icons.security, size: 14, color: Colors.blue),
+                        const Icon(
+                          Icons.security,
+                          size: 14,
+                          color: Colors.blue,
+                        ),
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
                             "Permissions synced successfully.",
                             style: TextStyle(
                               fontSize: 11,
-                              color: isDark ? Colors.blue.shade200 : Colors.blue.shade800,
+                              color: isDark
+                                  ? Colors.blue.shade200
+                                  : Colors.blue.shade800,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
@@ -2735,136 +3285,185 @@ class _NotificationsPageState extends State<NotificationsPage> {
                 child: isLoading
                     ? const Center(child: CircularProgressIndicator())
                     : filteredNotifications.isEmpty
-                        ? Center(
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(Icons.notifications_none, size: 64, color: Colors.grey.shade400),
-                                const SizedBox(height: 16),
-                                Text(
-                                  "No notifications found",
-                                  style: TextStyle(color: Colors.grey.shade500, fontSize: 16, fontWeight: FontWeight.bold),
-                                ),
-                              ],
+                    ? Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.notifications_none,
+                              size: 64,
+                              color: Colors.grey.shade400,
                             ),
-                          )
-                        : ListView.builder(
-                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-                            itemCount: filteredNotifications.length,
-                            itemBuilder: (context, index) {
-                              final item = filteredNotifications[index];
-                              final isRead = item['isRead'] ?? item['is_read'] ?? false;
-                              final type = (item['type'] ?? 'Alert').toString();
-                              final priority = (item['priority'] ?? 'Normal').toString();
-                              final isHigh = priority.toLowerCase() == 'high';
+                            const SizedBox(height: 16),
+                            Text(
+                              "No notifications found",
+                              style: TextStyle(
+                                color: Colors.grey.shade500,
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                      )
+                    : ListView.builder(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 20,
+                          vertical: 8,
+                        ),
+                        itemCount: filteredNotifications.length,
+                        itemBuilder: (context, index) {
+                          final item = filteredNotifications[index];
+                          final isRead =
+                              item['isRead'] ?? item['is_read'] ?? false;
+                          final type = (item['type'] ?? 'Alert').toString();
+                          final priority = (item['priority'] ?? 'Normal')
+                              .toString();
+                          final isHigh = priority.toLowerCase() == 'high';
 
-                              IconData leadIcon = Icons.info_outline;
-                              Color iconColor = Colors.blue;
-                              if (type.toLowerCase().contains('stock')) {
-                                leadIcon = Icons.warning_amber_rounded;
-                                iconColor = Colors.orange;
-                              } else if (type.toLowerCase().contains('billing')) {
-                                leadIcon = Icons.receipt_long_outlined;
-                                iconColor = Colors.green;
-                              }
+                          IconData leadIcon = Icons.info_outline;
+                          Color iconColor = Colors.blue;
+                          if (type.toLowerCase().contains('stock')) {
+                            leadIcon = Icons.warning_amber_rounded;
+                            iconColor = Colors.orange;
+                          } else if (type.toLowerCase().contains('billing')) {
+                            leadIcon = Icons.receipt_long_outlined;
+                            iconColor = Colors.green;
+                          }
 
-                              return GestureDetector(
-                                onTap: () {
-                                  setState(() {
-                                    if (item is Map) {
-                                      item['isRead'] = true;
-                                      item['is_read'] = true;
-                                    }
-                                  });
-                                  filterAndSearch();
-                                },
-                                child: Card(
-                                  elevation: 0,
-                                  margin: const EdgeInsets.only(bottom: 12),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(16),
-                                    side: BorderSide(
-                                      color: isDark 
-                                          ? Colors.white10 
-                                          : (isRead ? Colors.grey.shade100 : Colors.blue.shade100),
-                                      width: 1.5,
+                          return GestureDetector(
+                            onTap: () {
+                              setState(() {
+                                if (item is Map) {
+                                  item['isRead'] = true;
+                                  item['is_read'] = true;
+                                }
+                              });
+                              filterAndSearch();
+                            },
+                            child: Card(
+                              elevation: 0,
+                              margin: const EdgeInsets.only(bottom: 12),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16),
+                                side: BorderSide(
+                                  color: isDark
+                                      ? Colors.white10
+                                      : (isRead
+                                            ? Colors.grey.shade100
+                                            : Colors.blue.shade100),
+                                  width: 1.5,
+                                ),
+                              ),
+                              color: isDark
+                                  ? (isRead
+                                        ? Colors.white.withOpacity(0.03)
+                                        : Colors.white.withOpacity(0.06))
+                                  : (isRead
+                                        ? Colors.white
+                                        : const Color(0xFFEFF6FF)),
+                              child: Padding(
+                                padding: const EdgeInsets.all(16.0),
+                                child: Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.all(10),
+                                      decoration: BoxDecoration(
+                                        color: iconColor.withOpacity(0.1),
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: Icon(
+                                        leadIcon,
+                                        color: iconColor,
+                                        size: 20,
+                                      ),
                                     ),
-                                  ),
-                                  color: isDark 
-                                      ? (isRead ? Colors.white.withOpacity(0.03) : Colors.white.withOpacity(0.06))
-                                      : (isRead ? Colors.white : const Color(0xFFEFF6FF)),
-                                  child: Padding(
-                                    padding: const EdgeInsets.all(16.0),
-                                    child: Row(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Container(
-                                          padding: const EdgeInsets.all(10),
-                                          decoration: BoxDecoration(
-                                            color: iconColor.withOpacity(0.1),
-                                            shape: BoxShape.circle,
-                                          ),
-                                          child: Icon(leadIcon, color: iconColor, size: 20),
-                                        ),
-                                        const SizedBox(width: 12),
-                                        Expanded(
-                                          child: Column(
-                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Row(
+                                            mainAxisAlignment:
+                                                MainAxisAlignment.spaceBetween,
                                             children: [
-                                              Row(
-                                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                                children: [
-                                                  Expanded(
-                                                    child: Text(
-                                                      item['title'] ?? 'System Alert',
-                                                      style: TextStyle(
-                                                        fontWeight: isRead ? FontWeight.w600 : FontWeight.bold,
-                                                        fontSize: 15,
-                                                        color: isDark ? Colors.white : const Color(0xFF0F172A),
+                                              Expanded(
+                                                child: Text(
+                                                  item['title'] ??
+                                                      'System Alert',
+                                                  style: TextStyle(
+                                                    fontWeight: isRead
+                                                        ? FontWeight.w600
+                                                        : FontWeight.bold,
+                                                    fontSize: 15,
+                                                    color: isDark
+                                                        ? Colors.white
+                                                        : const Color(
+                                                            0xFF0F172A,
+                                                          ),
+                                                  ),
+                                                ),
+                                              ),
+                                              if (isHigh)
+                                                Container(
+                                                  padding:
+                                                      const EdgeInsets.symmetric(
+                                                        horizontal: 6,
+                                                        vertical: 2,
                                                       ),
+                                                  decoration: BoxDecoration(
+                                                    color: Colors.red
+                                                        .withOpacity(0.1),
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                          4,
+                                                        ),
+                                                  ),
+                                                  child: const Text(
+                                                    "HIGH",
+                                                    style: TextStyle(
+                                                      color: Colors.red,
+                                                      fontSize: 9,
+                                                      fontWeight:
+                                                          FontWeight.bold,
                                                     ),
                                                   ),
-                                                  if (isHigh)
-                                                    Container(
-                                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                                      decoration: BoxDecoration(
-                                                        color: Colors.red.withOpacity(0.1),
-                                                        borderRadius: BorderRadius.circular(4),
-                                                      ),
-                                                      child: const Text(
-                                                        "HIGH",
-                                                        style: TextStyle(color: Colors.red, fontSize: 9, fontWeight: FontWeight.bold),
-                                                      ),
-                                                    ),
-                                                ],
-                                              ),
-                                              const SizedBox(height: 6),
-                                              Text(
-                                                item['message'] ?? '',
-                                                style: TextStyle(
-                                                  fontSize: 13,
-                                                  color: isDark ? Colors.white70 : Colors.grey.shade700,
-                                                  height: 1.3,
                                                 ),
-                                              ),
-                                              const SizedBox(height: 10),
-                                              Text(
-                                                item['timestamp'] ?? item['created_at'] ?? 'Just now',
-                                                style: TextStyle(
-                                                  fontSize: 11,
-                                                  color: Colors.grey.shade500,
-                                                ),
-                                              ),
                                             ],
                                           ),
-                                        ),
-                                      ],
+                                          const SizedBox(height: 6),
+                                          Text(
+                                            item['message'] ?? '',
+                                            style: TextStyle(
+                                              fontSize: 13,
+                                              color: isDark
+                                                  ? Colors.white70
+                                                  : Colors.grey.shade700,
+                                              height: 1.3,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 10),
+                                          Text(
+                                            item['timestamp'] ??
+                                                item['created_at'] ??
+                                                'Just now',
+                                            style: TextStyle(
+                                              fontSize: 11,
+                                              color: Colors.grey.shade500,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
                                     ),
-                                  ),
+                                  ],
                                 ),
-                              );
-                            },
-                          ),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
               ),
             ],
           ),
