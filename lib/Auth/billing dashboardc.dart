@@ -3,6 +3,8 @@ import 'package:billingapp/purchase/purchase_update.dart';
 import 'package:billingapp/purchase/pricing_offers.dart';
 import 'package:billingapp/purchase/seller_update.dart';
 import 'package:billingapp/purchase/delivery_charges.dart';
+import 'package:billingapp/purchase/terms_conditions_page.dart';
+import 'package:billingapp/purchase/warranty_guarantee_page.dart';
 import 'package:billingapp/product/add product.dart';
 import 'package:billingapp/product/stock%20list.dart';
 import 'package:billingapp/product/storage.dart';
@@ -492,7 +494,7 @@ class DashboardUI extends StatelessWidget {
         context,
         MaterialPageRoute(builder: (_) => StoreMenuPage(role: role)),
       );
-    } else if (title == "Seller Update") {
+    } else if (title == "Seller Update" || title == "Seller Policies") {
       Navigator.push(
         context,
         MaterialPageRoute(builder: (_) => SellerUpdateMenuPage(role: role)),
@@ -2735,14 +2737,14 @@ class SellerUpdateMenuPage extends StatelessWidget {
           buildItem(
             context,
             "Terms & Conditions",
-            const PlaceholderDetailPage(title: "Terms & Conditions"),
+            const TermsConditionsPage(),
             Icons.article_outlined,
             Colors.indigo,
           ),
           buildItem(
             context,
             "Warranty & Guarantee",
-            const PlaceholderDetailPage(title: "Warranty & Guarantee"),
+            const WarrantyGuaranteePage(),
             Icons.verified_user_outlined,
             Colors.deepOrange,
           ),
