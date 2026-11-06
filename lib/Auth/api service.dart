@@ -1988,5 +1988,317 @@ class ApiService {
       return {};
     }
   }
-}
 
+  /// ✅ GET TERMS & CONDITIONS / RETURN POLICIES
+  /// Request: GET https://billing.srivagroups.in/api/terms-conditions?status=All&documentType=All
+  static Future<Map<String, dynamic>> getTermsConditions({
+    String status = "All",
+    String documentType = "All",
+  }) async {
+    final url = "/terms-conditions?status=$status&documentType=$documentType";
+    try {
+      _logApiRequest("GET TERMS & CONDITIONS", "GET", url);
+      final res = await http.get(
+        Uri.parse("$baseUrl$url"),
+        headers: await _getHeaders(auth: true),
+      );
+      final success = res.statusCode >= 200 && res.statusCode < 300;
+      _logApiResponse("GET TERMS & CONDITIONS", res.statusCode, res.body, success: success);
+      return _handleResponse(res);
+    } catch (e, stackTrace) {
+      _logApiError("Get Terms Conditions API", "GET", url, e, stackTrace);
+      return {};
+    }
+  }
+
+  /// ✅ CREATE TERMS & CONDITIONS / RETURN POLICY
+  /// Request: POST https://billing.srivagroups.in/api/terms-conditions
+  static Future<Map<String, dynamic>> createTermsConditions(Map<String, dynamic> data) async {
+    const url = "/terms-conditions";
+    try {
+      _logApiRequest("CREATE TERMS & CONDITIONS", "POST", url, payload: data);
+      final res = await http.post(
+        Uri.parse("$baseUrl$url"),
+        headers: await _getHeaders(auth: true),
+        body: jsonEncode(data),
+      );
+      final success = res.statusCode >= 200 && res.statusCode < 300;
+      _logApiResponse("CREATE TERMS & CONDITIONS", res.statusCode, res.body, success: success);
+      return _handleResponse(res);
+    } catch (e, stackTrace) {
+      _logApiError("Create Terms Conditions API", "POST", url, e, stackTrace);
+      return {};
+    }
+  }
+
+  /// ✅ UPDATE TERMS & CONDITIONS / RETURN POLICY
+  /// Request: PUT https://billing.srivagroups.in/api/terms-conditions/{id}
+  static Future<Map<String, dynamic>> updateTermsConditions(int id, Map<String, dynamic> data) async {
+    final url = "/terms-conditions/$id";
+    try {
+      _logApiRequest("UPDATE TERMS & CONDITIONS", "PUT", url, payload: data);
+      final res = await http.put(
+        Uri.parse("$baseUrl$url"),
+        headers: await _getHeaders(auth: true),
+        body: jsonEncode(data),
+      );
+      final success = res.statusCode >= 200 && res.statusCode < 300;
+      _logApiResponse("UPDATE TERMS & CONDITIONS", res.statusCode, res.body, success: success);
+      return _handleResponse(res);
+    } catch (e, stackTrace) {
+      _logApiError("Update Terms Conditions API", "PUT", url, e, stackTrace);
+      return {};
+    }
+  }
+
+  /// ✅ DELETE TERMS & CONDITIONS / RETURN POLICY
+  /// Request: DELETE https://billing.srivagroups.in/api/terms-conditions/{id}
+  static Future<Map<String, dynamic>> deleteTermsConditions(int id) async {
+    final url = "/terms-conditions/$id";
+    try {
+      _logApiRequest("DELETE TERMS & CONDITIONS", "DELETE", url);
+      final res = await http.delete(
+        Uri.parse("$baseUrl$url"),
+        headers: await _getHeaders(auth: true),
+      );
+      final success = res.statusCode >= 200 && res.statusCode < 300;
+      _logApiResponse("DELETE TERMS & CONDITIONS", res.statusCode, res.body, success: success);
+      return _handleResponse(res);
+    } catch (e, stackTrace) {
+      _logApiError("Delete Terms Conditions API", "DELETE", url, e, stackTrace);
+      return {};
+    }
+  }
+
+  /// ✅ GET NEW PRODUCTS
+  /// Request: GET https://billing.srivagroups.in/api/new-product
+  static Future<Map<String, dynamic>> getNewProducts() async {
+    const url = "/new-product";
+    try {
+      _logApiRequest("GET NEW PRODUCTS", "GET", url);
+      final res = await http.get(
+        Uri.parse("$baseUrl$url"),
+        headers: await _getHeaders(auth: true),
+      );
+      final success = res.statusCode >= 200 && res.statusCode < 300;
+      _logApiResponse("GET NEW PRODUCTS", res.statusCode, res.body, success: success);
+      return _handleResponse(res);
+    } catch (e, stackTrace) {
+      _logApiError("Get New Products API", "GET", url, e, stackTrace);
+      return {};
+    }
+  }
+
+  /// ✅ GET WARRANTY LIST
+  /// Request: GET https://billing.srivagroups.in/api/warranty
+  static Future<Map<String, dynamic>> getWarrantyList() async {
+    const url = "/warranty";
+    try {
+      _logApiRequest("GET WARRANTY LIST", "GET", url);
+      final res = await http.get(
+        Uri.parse("$baseUrl$url"),
+        headers: await _getHeaders(auth: true),
+      );
+      final success = res.statusCode >= 200 && res.statusCode < 300;
+      _logApiResponse("GET WARRANTY LIST", res.statusCode, res.body, success: success);
+      return _handleResponse(res);
+    } catch (e, stackTrace) {
+      _logApiError("Get Warranty List API", "GET", url, e, stackTrace);
+      return {};
+    }
+  }
+
+  /// ✅ GET ALL PRODUCTS
+  /// Request: GET https://billing.srivagroups.in/api/products
+  static Future<Map<String, dynamic>> getAllProducts() async {
+    const url = "/products";
+    try {
+      _logApiRequest("GET ALL PRODUCTS", "GET", url);
+      final res = await http.get(
+        Uri.parse("$baseUrl$url"),
+        headers: await _getHeaders(auth: true),
+      );
+      final success = res.statusCode >= 200 && res.statusCode < 300;
+      _logApiResponse("GET ALL PRODUCTS", res.statusCode, res.body, success: success);
+      return _handleResponse(res);
+    } catch (e, stackTrace) {
+      _logApiError("Get All Products API", "GET", url, e, stackTrace);
+      return {};
+    }
+  }
+
+  /// ✅ GET STOCKS
+  /// Request: GET https://billing.srivagroups.in/api/stocks
+  static Future<Map<String, dynamic>> getStocks() async {
+    const url = "/stocks";
+    try {
+      _logApiRequest("GET STOCKS", "GET", url);
+      final res = await http.get(
+        Uri.parse("$baseUrl$url"),
+        headers: await _getHeaders(auth: true),
+      );
+      final success = res.statusCode >= 200 && res.statusCode < 300;
+      _logApiResponse("GET STOCKS", res.statusCode, res.body, success: success);
+      return _handleResponse(res);
+    } catch (e, stackTrace) {
+      _logApiError("Get Stocks API", "GET", url, e, stackTrace);
+      return {};
+    }
+  }
+
+  /// ✅ GET WITHOUT-VARIANT STOCKS
+  /// Request: GET https://billing.srivagroups.in/api/w_variant/stock
+  static Future<Map<String, dynamic>> getWVariantStocks() async {
+    const url = "/w_variant/stock";
+    try {
+      _logApiRequest("GET W_VARIANT STOCKS", "GET", url);
+      final res = await http.get(
+        Uri.parse("$baseUrl$url"),
+        headers: await _getHeaders(auth: true),
+      );
+      final success = res.statusCode >= 200 && res.statusCode < 300;
+      _logApiResponse("GET W_VARIANT STOCKS", res.statusCode, res.body, success: success);
+      return _handleResponse(res);
+    } catch (e, stackTrace) {
+      _logApiError("Get W_Variant Stocks API", "GET", url, e, stackTrace);
+      return {};
+    }
+  }
+
+  /// ✅ CREATE WARRANTY
+  /// Request: POST https://billing.srivagroups.in/api/warranty
+  static Future<Map<String, dynamic>> createWarranty(Map<String, dynamic> data) async {
+    const url = "/warranty";
+    try {
+      _logApiRequest("CREATE WARRANTY", "POST", url, payload: data);
+      final res = await http.post(
+        Uri.parse("$baseUrl$url"),
+        headers: await _getHeaders(auth: true),
+        body: jsonEncode(data),
+      );
+      final success = res.statusCode >= 200 && res.statusCode < 300;
+      _logApiResponse("CREATE WARRANTY", res.statusCode, res.body, success: success);
+      return _handleResponse(res);
+    } catch (e, stackTrace) {
+      _logApiError("Create Warranty API", "POST", url, e, stackTrace);
+      return {};
+    }
+  }
+
+  /// ✅ UPDATE WARRANTY
+  /// Request: PUT https://billing.srivagroups.in/api/warranty/{id}
+  static Future<Map<String, dynamic>> updateWarranty(int id, Map<String, dynamic> data) async {
+    final url = "/warranty/$id";
+    try {
+      _logApiRequest("UPDATE WARRANTY", "PUT", url, payload: data);
+      final res = await http.put(
+        Uri.parse("$baseUrl$url"),
+        headers: await _getHeaders(auth: true),
+        body: jsonEncode(data),
+      );
+      final success = res.statusCode >= 200 && res.statusCode < 300;
+      _logApiResponse("UPDATE WARRANTY", res.statusCode, res.body, success: success);
+      return _handleResponse(res);
+    } catch (e, stackTrace) {
+      _logApiError("Update Warranty API", "PUT", url, e, stackTrace);
+      return {};
+    }
+  }
+
+  /// ✅ DELETE WARRANTY
+  /// Request: DELETE https://billing.srivagroups.in/api/warranty/{id}
+  static Future<Map<String, dynamic>> deleteWarranty(int id) async {
+    final url = "/warranty/$id";
+    try {
+      _logApiRequest("DELETE WARRANTY", "DELETE", url);
+      final res = await http.delete(
+        Uri.parse("$baseUrl$url"),
+        headers: await _getHeaders(auth: true),
+      );
+      final success = res.statusCode >= 200 && res.statusCode < 300;
+      _logApiResponse("DELETE WARRANTY", res.statusCode, res.body, success: success);
+      return _handleResponse(res);
+    } catch (e, stackTrace) {
+      _logApiError("Delete Warranty API", "DELETE", url, e, stackTrace);
+      return {};
+    }
+  }
+
+  /// ✅ GET GUARANTEE LIST
+  /// Request: GET https://billing.srivagroups.in/api/guarantee
+  static Future<Map<String, dynamic>> getGuaranteeList() async {
+    const url = "/guarantee";
+    try {
+      _logApiRequest("GET GUARANTEE LIST", "GET", url);
+      final res = await http.get(
+        Uri.parse("$baseUrl$url"),
+        headers: await _getHeaders(auth: true),
+      );
+      final success = res.statusCode >= 200 && res.statusCode < 300;
+      _logApiResponse("GET GUARANTEE LIST", res.statusCode, res.body, success: success);
+      return _handleResponse(res);
+    } catch (e, stackTrace) {
+      _logApiError("Get Guarantee List API", "GET", url, e, stackTrace);
+      return {};
+    }
+  }
+
+  /// ✅ CREATE GUARANTEE
+  /// Request: POST https://billing.srivagroups.in/api/guarantee
+  static Future<Map<String, dynamic>> createGuarantee(Map<String, dynamic> data) async {
+    const url = "/guarantee";
+    try {
+      _logApiRequest("CREATE GUARANTEE", "POST", url, payload: data);
+      final res = await http.post(
+        Uri.parse("$baseUrl$url"),
+        headers: await _getHeaders(auth: true),
+        body: jsonEncode(data),
+      );
+      final success = res.statusCode >= 200 && res.statusCode < 300;
+      _logApiResponse("CREATE GUARANTEE", res.statusCode, res.body, success: success);
+      return _handleResponse(res);
+    } catch (e, stackTrace) {
+      _logApiError("Create Guarantee API", "POST", url, e, stackTrace);
+      return {};
+    }
+  }
+
+  /// ✅ UPDATE GUARANTEE
+  /// Request: PUT https://billing.srivagroups.in/api/guarantee/{id}
+  static Future<Map<String, dynamic>> updateGuarantee(int id, Map<String, dynamic> data) async {
+    final url = "/guarantee/$id";
+    try {
+      _logApiRequest("UPDATE GUARANTEE", "PUT", url, payload: data);
+      final res = await http.put(
+        Uri.parse("$baseUrl$url"),
+        headers: await _getHeaders(auth: true),
+        body: jsonEncode(data),
+      );
+      final success = res.statusCode >= 200 && res.statusCode < 300;
+      _logApiResponse("UPDATE GUARANTEE", res.statusCode, res.body, success: success);
+      return _handleResponse(res);
+    } catch (e, stackTrace) {
+      _logApiError("Update Guarantee API", "PUT", url, e, stackTrace);
+      return {};
+    }
+  }
+
+  /// ✅ DELETE GUARANTEE
+  /// Request: DELETE https://billing.srivagroups.in/api/guarantee/{id}
+  static Future<Map<String, dynamic>> deleteGuarantee(int id) async {
+    final url = "/guarantee/$id";
+    try {
+      _logApiRequest("DELETE GUARANTEE", "DELETE", url);
+      final res = await http.delete(
+        Uri.parse("$baseUrl$url"),
+        headers: await _getHeaders(auth: true),
+      );
+      final success = res.statusCode >= 200 && res.statusCode < 300;
+      _logApiResponse("DELETE GUARANTEE", res.statusCode, res.body, success: success);
+      return _handleResponse(res);
+    } catch (e, stackTrace) {
+      _logApiError("Delete Guarantee API", "DELETE", url, e, stackTrace);
+      return {};
+    }
+  }
+}
