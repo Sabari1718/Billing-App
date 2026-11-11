@@ -124,9 +124,14 @@ class ApiService {
       final body = jsonDecode(res.body);
 
       if (res.statusCode >= 200 && res.statusCode < 300) {
-        return body is Map<String, dynamic>
-            ? body
-            : {"data": body}; // handle list response
+        if (body is Map<String, dynamic>) {
+          if (!body.containsKey("success")) {
+            body["success"] = true;
+          }
+          return body;
+        } else {
+          return {"data": body, "success": true};
+        }
       } else {
         throw Exception(body.toString());
       }

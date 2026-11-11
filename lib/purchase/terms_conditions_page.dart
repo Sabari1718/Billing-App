@@ -263,10 +263,10 @@ class _TermsConditionsPageState extends State<TermsConditionsPage> {
     setState(() => _isLoading = true);
     try {
       await Future.wait([
-        ApiService.getStores(),
-        ApiService.getNotifications(),
-        ApiService.getUserPermissions(),
-        _fetchTermsConditions(),
+        _safeApiCall(() => ApiService.getStores()),
+        _safeApiCall(() => ApiService.getNotifications()),
+        _safeApiCall(() => ApiService.getUserPermissions()),
+        _safeApiCall(() => _fetchTermsConditions()),
       ]);
     } catch (e) {
       debugPrint("Error fetching initial data: $e");
@@ -275,11 +275,28 @@ class _TermsConditionsPageState extends State<TermsConditionsPage> {
     }
   }
 
+  static Future<void> _safeApiCall(Future Function() fn) async {
+    try {
+      await fn();
+    } catch (e) {
+      debugPrint("API Call Error: $e");
+    }
+  }
+
   Future<void> _fetchTermsConditions() async {
     try {
       final res = await ApiService.getTermsConditions(status: "All", documentType: "All");
-      if (res['success'] == true && res['data'] is List) {
-        final list = (res['data'] as List)
+      List? rawList;
+      if (res['data'] is List) {
+        rawList = res['data'] as List;
+      } else if (res['policies'] is List) {
+        rawList = res['policies'] as List;
+      } else if (res['terms'] is List) {
+        rawList = res['terms'] as List;
+      }
+
+      if (rawList != null && rawList.isNotEmpty) {
+        final list = rawList
             .map((e) => _PolicyDoc.fromApi(Map<String, dynamic>.from(e)))
             .toList();
         if (mounted) {

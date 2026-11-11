@@ -89,7 +89,7 @@ class _WarrantyEntry {
     createdOn: json['createdOn'] as String? ?? '04/08/2026',
   );
 
-  factory _WarrantyEntry.fromApi(Map<String, dynamic> json) {
+  factory _WarrantyEntry.fromApi(Map<String, dynamic> json, {String? defaultType}) {
     final rawStartDate = json['start_date']?.toString();
     final rawEndDate = json['end_date']?.toString();
     final rawCreatedAt = json['created_at']?.toString();
@@ -137,7 +137,8 @@ class _WarrantyEntry {
       json['periodUnit']?.toString() ??
       'Years';
 
-    final isGuarantee = json['item_type']?.toString().toLowerCase() == 'guarantee' ||
+    final isGuarantee = (defaultType != null && defaultType.toLowerCase() == 'guarantee') ||
+        json['item_type']?.toString().toLowerCase() == 'guarantee' ||
         json.containsKey('guarantee_period') ||
         json.containsKey('guarantee_type');
 
@@ -149,7 +150,7 @@ class _WarrantyEntry {
     return _WarrantyEntry(
       id: int.tryParse(json['id']?.toString() ?? '0') ?? 0,
       productId: int.tryParse(json['product_id']?.toString() ?? '0') ?? 0,
-      type: isGuarantee ? 'Guarantee' : (json['item_type']?.toString() ?? json['type']?.toString() ?? 'Warranty'),
+      type: isGuarantee ? 'Guarantee' : 'Warranty',
       productName: json['product_name']?.toString() ?? json['productName']?.toString() ?? '',
       productCode: json['product_code']?.toString() ?? json['productCode']?.toString() ?? 'PRD-0000',
       category: json['category_name']?.toString() ?? json['category']?.toString() ?? 'General',
@@ -188,6 +189,8 @@ class _ProductItem {
 
   factory _ProductItem.fromJson(Map<String, dynamic> json) {
     final List<String> parsedVariants = [];
+
+    // 1. variant_details (from /api/products)
     if (json['variant_details'] is List) {
       for (var v in json['variant_details']) {
         if (v is Map && v['variant_name'] != null) {
@@ -199,13 +202,43 @@ class _ProductItem {
       }
     }
 
+    // 2. variants (from /api/stocks)
+    if (json['variants'] is List) {
+      for (var v in json['variants']) {
+        if (v is Map && v['variant_name'] != null) {
+          final vName = v['variant_name'].toString().trim();
+          if (vName.isNotEmpty && !parsedVariants.contains(vName)) {
+            parsedVariants.add(vName);
+          }
+        }
+      }
+    }
+
+    final pId = int.tryParse(
+      json['product_id']?.toString() ?? json['id']?.toString() ?? '0',
+    ) ?? 0;
+
+    final pCode = json['product_code']?.toString() ??
+        json['sku']?.toString() ??
+        (pId > 0 ? "PRD-$pId" : "");
+
+    String? bName = json['brand_name']?.toString();
+    if (bName == null && json['brand'] is Map) {
+      bName = json['brand']['name']?.toString();
+    }
+
+    String? cName = json['category_name']?.toString();
+    if (cName == null && json['category'] is Map) {
+      cName = json['category']['name']?.toString();
+    }
+
     return _ProductItem(
-      productId: int.tryParse(json['product_id']?.toString() ?? json['id']?.toString() ?? '0') ?? 0,
+      productId: pId,
       productName: json['product_name']?.toString() ?? '',
-      productCode: json['product_code']?.toString() ?? '',
-      brandName: json['brand_name']?.toString(),
-      brandId: json['brand_id'],
-      categoryName: json['category_name']?.toString(),
+      productCode: pCode,
+      brandName: bName,
+      brandId: json['brand_id'] ?? (json['brand'] is Map ? json['brand']['id'] : null),
+      categoryName: cName,
       variants: parsedVariants,
     );
   }
@@ -406,15 +439,12 @@ class _WarrantyGuaranteePageState extends State<WarrantyGuaranteePage> {
     setState(() => _isLoading = true);
     try {
       await Future.wait([
-        ApiService.getStores(),
-        ApiService.getNotifications(),
-        ApiService.getUserPermissions(),
-        ApiService.getNewProducts(),
-        ApiService.getStocks(), // ✅ GET /api/stocks
-        ApiService.getWVariantStocks(), // ✅ GET /api/w_variant/stock
-        _fetchProducts(), // ✅ GET /api/products
-        _fetchWarrantyList(), // ✅ GET /api/warranty
-        _fetchGuaranteeList(), // ✅ GET /api/guarantee
+        _safeApiCall(() => ApiService.getStores()),
+        _safeApiCall(() => ApiService.getNotifications()),
+        _safeApiCall(() => ApiService.getUserPermissions()),
+        _safeApiCall(() => _fetchCombinedProductsAndStocks()),
+        _safeApiCall(() => _fetchWarrantyList()),
+        _safeApiCall(() => _fetchGuaranteeList()),
       ]);
     } catch (e) {
       debugPrint("Error fetching initial warranty data: $e");
@@ -423,8 +453,27 @@ class _WarrantyGuaranteePageState extends State<WarrantyGuaranteePage> {
     }
   }
 
-  /// ✅ GET PRODUCTS: Connects https://billing.srivagroups.in/api/products
-  Future<void> _fetchProducts() async {
+  static Future<void> _safeApiCall(Future Function() fn) async {
+    try {
+      await fn();
+    } catch (e) {
+      debugPrint("API Call Error: $e");
+    }
+  }
+
+  /// ✅ COMBINE PRODUCTS, STOCKS & W_VARIANT STOCKS
+  /// Connects:
+  /// 1. GET https://billing.srivagroups.in/api/products
+  /// 2. GET https://billing.srivagroups.in/api/stocks
+  /// 3. GET https://billing.srivagroups.in/api/w_variant/stock
+  Future<void> _fetchCombinedProductsAndStocks() async {
+    final Map<int, _ProductItem> productMap = {};
+    for (var p in _products) {
+      productMap[p.productId] = p;
+    }
+    final Set<String> brandSet = Set.from(_availableBrands);
+
+    // 1. Fetch /api/products
     try {
       final res = await ApiService.getAllProducts();
       List rawList = [];
@@ -436,31 +485,110 @@ class _WarrantyGuaranteePageState extends State<WarrantyGuaranteePage> {
         rawList = res['data'];
       }
 
-      if (rawList.isNotEmpty) {
-        final List<_ProductItem> loaded = [];
-        final Set<String> brandSet = Set.from(_availableBrands);
+      for (var item in rawList) {
+        if (item is Map) {
+          final p = _ProductItem.fromJson(Map<String, dynamic>.from(item));
+          if (p.productId > 0 && p.productName.isNotEmpty) {
+            productMap[p.productId] = p;
+            if (p.brandName != null && p.brandName!.trim().isNotEmpty) {
+              brandSet.add(p.brandName!.trim());
+            }
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint("Error fetching /api/products: $e");
+    }
 
-        for (var item in rawList) {
-          if (item is Map) {
-            final p = _ProductItem.fromJson(Map<String, dynamic>.from(item));
-            if (p.productName.isNotEmpty) {
-              loaded.add(p);
-              if (p.brandName != null && p.brandName!.trim().isNotEmpty) {
-                brandSet.add(p.brandName!.trim());
+    // 2. Fetch /api/stocks (Includes stock items with variant arrays)
+    try {
+      final res = await ApiService.getStocks();
+      List rawStocks = [];
+      if (res['data'] is List) {
+        rawStocks = res['data'];
+      } else if (res['stocks'] is List) {
+        rawStocks = res['stocks'];
+      }
+
+      for (var item in rawStocks) {
+        if (item is Map) {
+          final s = _ProductItem.fromJson(Map<String, dynamic>.from(item));
+          if (s.productId > 0 && s.productName.isNotEmpty) {
+            if (productMap.containsKey(s.productId)) {
+              final existing = productMap[s.productId]!;
+              final mergedVariants = Set<String>.from(existing.variants)..addAll(s.variants);
+              productMap[s.productId] = _ProductItem(
+                productId: existing.productId,
+                productName: existing.productName.isNotEmpty ? existing.productName : s.productName,
+                productCode: existing.productCode.isNotEmpty ? existing.productCode : s.productCode,
+                brandName: existing.brandName ?? s.brandName,
+                brandId: existing.brandId ?? s.brandId,
+                categoryName: existing.categoryName ?? s.categoryName,
+                variants: mergedVariants.toList(),
+              );
+            } else {
+              productMap[s.productId] = s;
+            }
+            if (s.brandName != null && s.brandName!.trim().isNotEmpty) {
+              brandSet.add(s.brandName!.trim());
+            }
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint("Error fetching /api/stocks: $e");
+    }
+
+    // 3. Fetch /api/w_variant/stock (Without-variant stock items)
+    try {
+      final res = await ApiService.getWVariantStocks();
+      List rawWStocks = [];
+      if (res['data'] is List) {
+        rawWStocks = res['data'];
+      } else if (res['stocks'] is List) {
+        rawWStocks = res['stocks'];
+      }
+
+      for (var item in rawWStocks) {
+        if (item is Map) {
+          final pId = int.tryParse(item['product_id']?.toString() ?? item['id']?.toString() ?? '0') ?? 0;
+          final pName = item['product_name']?.toString() ?? '';
+          if (pId > 0 && pName.isNotEmpty) {
+            if (!productMap.containsKey(pId)) {
+              productMap[pId] = _ProductItem(
+                productId: pId,
+                productName: pName,
+                productCode: item['product_code']?.toString() ?? "PRD-$pId",
+                brandName: item['brand_name']?.toString() ?? "Imported",
+                categoryName: item['category_name']?.toString() ?? "General",
+                variants: ["Standard"],
+              );
+            } else {
+              final existing = productMap[pId]!;
+              if (existing.variants.isEmpty) {
+                productMap[pId] = _ProductItem(
+                  productId: existing.productId,
+                  productName: existing.productName,
+                  productCode: existing.productCode,
+                  brandName: existing.brandName,
+                  brandId: existing.brandId,
+                  categoryName: existing.categoryName,
+                  variants: ["Standard"],
+                );
               }
             }
           }
         }
-
-        if (mounted && loaded.isNotEmpty) {
-          setState(() {
-            _products = loaded;
-            _availableBrands = brandSet.toList();
-          });
-        }
       }
     } catch (e) {
-      debugPrint("Error fetching products in warranty page: $e");
+      debugPrint("Error fetching /api/w_variant/stock: $e");
+    }
+
+    if (mounted && productMap.isNotEmpty) {
+      setState(() {
+        _products = productMap.values.toList();
+        _availableBrands = brandSet.toList();
+      });
     }
   }
 
@@ -513,9 +641,18 @@ class _WarrantyGuaranteePageState extends State<WarrantyGuaranteePage> {
   Future<void> _fetchWarrantyList() async {
     try {
       final res = await ApiService.getWarrantyList();
-      if (res['success'] == true && res['data'] is List) {
-        final list = (res['data'] as List)
-            .map((e) => _WarrantyEntry.fromApi(Map<String, dynamic>.from(e)))
+      List? rawList;
+      if (res['data'] is List) {
+        rawList = res['data'] as List;
+      } else if (res['warranty'] is List) {
+        rawList = res['warranty'] as List;
+      } else if (res['products'] is List) {
+        rawList = res['products'] as List;
+      }
+
+      if (rawList != null && rawList.isNotEmpty) {
+        final list = rawList
+            .map((e) => _WarrantyEntry.fromApi(Map<String, dynamic>.from(e), defaultType: "Warranty"))
             .toList();
         if (mounted) {
           setState(() {
@@ -533,9 +670,16 @@ class _WarrantyGuaranteePageState extends State<WarrantyGuaranteePage> {
   Future<void> _fetchGuaranteeList() async {
     try {
       final res = await ApiService.getGuaranteeList();
-      if (res['success'] == true && res['data'] is List) {
-        final list = (res['data'] as List)
-            .map((e) => _WarrantyEntry.fromApi(Map<String, dynamic>.from(e)))
+      List? rawList;
+      if (res['data'] is List) {
+        rawList = res['data'] as List;
+      } else if (res['guarantee'] is List) {
+        rawList = res['guarantee'] as List;
+      }
+
+      if (rawList != null && rawList.isNotEmpty) {
+        final list = rawList
+            .map((e) => _WarrantyEntry.fromApi(Map<String, dynamic>.from(e), defaultType: "Guarantee"))
             .toList();
         if (mounted) {
           setState(() {
