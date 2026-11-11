@@ -494,7 +494,12 @@ class DashboardUI extends StatelessWidget {
         context,
         MaterialPageRoute(builder: (_) => StoreMenuPage(role: role)),
       );
-    } else if (title == "Seller Update" || title == "Seller Policies") {
+    } else if (title == "Seller Policies") {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => SellerPoliciesMenuPage(role: role)),
+      );
+    } else if (title == "Seller Update") {
       Navigator.push(
         context,
         MaterialPageRoute(builder: (_) => SellerUpdateMenuPage(role: role)),
@@ -1190,6 +1195,21 @@ class DashboardUI extends StatelessWidget {
                   MaterialPageRoute(builder: (_) => const SupplierListPage()),
                 ),
               ),
+              const SizedBox(width: 10),
+              _buildShortcutPill(
+                context,
+                title: "Seller Policies",
+                icon: Icons.verified_user_outlined,
+                color: const Color(0xFF4F46E5),
+                isDark: isDark,
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) =>
+                        SellerPoliciesMenuPage(role: controller.role.value),
+                  ),
+                ),
+              ),
             ],
           ),
         ),
@@ -1357,6 +1377,26 @@ class DashboardUI extends StatelessWidget {
               accentColor: const Color(0xFFEC4899),
               isDark: isDark,
               onTap: () => _handleCardTap(context, "Store", currentRole),
+            ),
+            _buildModernModuleCard(
+              context: context,
+              title: "Seller Policies",
+              subtitle: "Terms & Warranty",
+              icon: Icons.verified_user_rounded,
+              accentColor: const Color(0xFF4F46E5),
+              isDark: isDark,
+              onTap: () =>
+                  _handleCardTap(context, "Seller Policies", currentRole),
+            ),
+            _buildModernModuleCard(
+              context: context,
+              title: "Seller Update",
+              subtitle: "Charges, Pricing & Offers",
+              icon: Icons.store_mall_directory_rounded,
+              accentColor: const Color(0xFF0EA5E9),
+              isDark: isDark,
+              onTap: () =>
+                  _handleCardTap(context, "Seller Update", currentRole),
             ),
           ],
         ),
@@ -1642,6 +1682,44 @@ class DashboardUI extends StatelessWidget {
                   leading: const Icon(Icons.dashboard_outlined),
                   title: const Text("Dashboard"),
                   onTap: () => Navigator.pop(context),
+                ),
+                ListTile(
+                  leading: const Icon(
+                    Icons.verified_user_outlined,
+                    color: Color(0xFF4F46E5),
+                  ),
+                  title: const Text("Seller Policies"),
+                  subtitle: const Text(
+                    "Terms & Warranty",
+                    style: TextStyle(fontSize: 12),
+                  ),
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) =>
+                            SellerPoliciesMenuPage(role: controller.role.value),
+                      ),
+                    );
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(
+                    Icons.store_mall_directory_outlined,
+                    color: Color(0xFF0EA5E9),
+                  ),
+                  title: const Text("Seller Update"),
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) =>
+                            SellerUpdateMenuPage(role: controller.role.value),
+                      ),
+                    );
+                  },
                 ),
                 ExpansionTile(
                   leading: const Icon(Icons.settings),
@@ -2640,6 +2718,105 @@ class StoreMenuPage extends StatelessWidget {
             const DynamicSelectionPage(),
             Icons.dynamic_feed,
             Colors.orange,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class SellerPoliciesMenuPage extends StatelessWidget {
+  final String role;
+  const SellerPoliciesMenuPage({super.key, required this.role});
+
+  Widget buildItem(
+    BuildContext context,
+    String title,
+    String subtitle,
+    Widget page,
+    IconData icon,
+    Color color,
+  ) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Card(
+      elevation: 0,
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(
+          color: isDark ? const Color(0xFF334155) : Colors.grey.shade200,
+        ),
+      ),
+      color: isDark ? const Color(0xFF1E293B) : Colors.white,
+      child: ListTile(
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+        leading: Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.12),
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: Icon(icon, color: color, size: 26),
+        ),
+        title: Text(
+          title,
+          style: TextStyle(
+            fontWeight: FontWeight.w700,
+            fontSize: 16,
+            color: isDark ? Colors.white : const Color(0xFF0F172A),
+          ),
+        ),
+        subtitle: Padding(
+          padding: const EdgeInsets.only(top: 4),
+          child: Text(
+            subtitle,
+            style: TextStyle(
+              fontSize: 13,
+              color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
+            ),
+          ),
+        ),
+        trailing: Icon(
+          Icons.arrow_forward_ios,
+          size: 16,
+          color: Colors.grey.shade400,
+        ),
+        onTap: () {
+          Navigator.push(context, MaterialPageRoute(builder: (_) => page));
+        },
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Scaffold(
+      backgroundColor:
+          isDark ? const Color(0xFF0F172A) : const Color(0xFFF3F4F6),
+      appBar: AppBar(
+        title: const Text("Seller Policies"),
+        backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+      ),
+      body: ListView(
+        padding: const EdgeInsets.only(top: 16, bottom: 20),
+        children: [
+          buildItem(
+            context,
+            "Terms & Conditions",
+            "Configure sales terms, invoice notes & return policies",
+            const TermsConditionsPage(),
+            Icons.article_outlined,
+            Colors.indigo,
+          ),
+          buildItem(
+            context,
+            "Warranty & Guarantee",
+            "Configure coverage periods, brand & variant policies",
+            const WarrantyGuaranteePage(),
+            Icons.verified_user_outlined,
+            Colors.deepOrange,
           ),
         ],
       ),
