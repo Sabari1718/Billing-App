@@ -98,12 +98,76 @@ class _SupplierQuotationPageState extends State<SupplierQuotationPage> {
 
       if (response.statusCode == 200) {
         final decoded = jsonDecode(response.body);
-        final list = decoded['data'] is List ? decoded['data'] as List : (decoded is List ? decoded : []);
+        List rawList = [];
+        if (decoded is List) {
+          rawList = decoded;
+        } else if (decoded is Map) {
+          if (decoded['data'] is List) {
+            rawList = decoded['data'];
+          } else if (decoded['data'] is Map && decoded['data']['data'] is List) {
+            rawList = decoded['data']['data'];
+          }
+        }
+
+        final List<Map<String, dynamic>> parsedList = [];
+        for (var e in rawList) {
+          if (e is! Map) continue;
+          final items = (e['products'] is List && (e['products'] as List).isNotEmpty)
+              ? e['products'] as List
+              : (e['items'] is List && (e['items'] as List).isNotEmpty)
+                  ? e['items'] as List
+                  : (e['quotation_items'] is List && (e['quotation_items'] as List).isNotEmpty)
+                      ? e['quotation_items'] as List
+                      : (e['mapping_items'] is List && (e['mapping_items'] as List).isNotEmpty)
+                          ? e['mapping_items'] as List
+                          : [];
+
+          num amount = num.tryParse(e['total_with_gst']?.toString() ?? "") ??
+              num.tryParse(e['total_amount']?.toString() ?? "") ??
+              num.tryParse(e['amount']?.toString() ?? "") ??
+              0;
+
+          if (amount == 0 && items.isNotEmpty) {
+            for (var it in items) {
+              final p = num.tryParse(it['price_without_gst']?.toString() ?? it['target_price']?.toString() ?? it['price']?.toString() ?? "") ?? 0;
+              final q = num.tryParse(it['quantity']?.toString() ?? "") ?? 1;
+              final tax = num.tryParse(it['tax_amount']?.toString() ?? it['total_tax']?.toString() ?? "") ?? 0;
+              amount += (num.tryParse(it['total_with_gst']?.toString() ?? "") ?? (p * q + tax));
+            }
+          }
+
+          String pName = (e['product_name'] ?? e['product'] ?? "").toString().trim();
+          if ((pName.isEmpty || pName == "No Items") && items.isNotEmpty) {
+            final first = items[0];
+            final n = (first['product']?['name'] ?? first['product']?['product_name'] ?? first['product_name'] ?? first['name'] ?? "").toString().trim();
+            final v = (first['variant']?['name'] ?? first['variant_name'] ?? "").toString().trim();
+            pName = (v.isNotEmpty && !n.contains(v)) ? "$n ($v)" : (n.isNotEmpty ? n : "Product");
+            if (items.length > 1) {
+              pName += " (+${items.length - 1} more)";
+            }
+          }
+          if (pName.isEmpty) pName = "No Items";
+
+          String dateStr = (e['request_date'] ?? e['created_at'] ?? "N/A").toString();
+          if (dateStr.contains("T")) dateStr = dateStr.split("T")[0];
+          if (dateStr.contains(" ")) dateStr = dateStr.split(" ")[0];
+
+          parsedList.add({
+            ...Map<String, dynamic>.from(e),
+            "id": e['id'],
+            "rfq_id": e['rfq_reference'] ?? e['quotation_code'] ?? e['reference_number'] ?? "RFQ-${e['id']}",
+            "product_name": pName,
+            "total_amount": amount,
+            "amount": "₹${amount.toStringAsFixed(2)}",
+            "request_date": dateStr,
+            "status": (e['status'] ?? "Pending").toString(),
+            "items": items,
+          });
+        }
+
         if (mounted) {
           setState(() {
-            quotations = list.isNotEmpty
-                ? list.map<Map<String, dynamic>>((e) => Map<String, dynamic>.from(e)).toList()
-                : List.from(kLiveQuotationsData);
+            quotations = parsedList.isNotEmpty ? parsedList : List.from(kLiveQuotationsData);
             isLoading = false;
           });
           return;

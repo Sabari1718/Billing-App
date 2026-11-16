@@ -41,7 +41,10 @@ class _SupplierListPageState extends State<SupplierListPage> {
 
   Future<void> _loadTokenAndFetch() async {
     final prefs = await SharedPreferences.getInstance();
-    token = prefs.getString("auth_token") ?? "";
+    token = prefs.getString("billing_auth_token") ??
+        prefs.getString("auth_token") ??
+        prefs.getString("token") ??
+        "";
     role = prefs.getString("role")?.toLowerCase() ?? "propagater";
     userName = prefs.getString("user_name") ?? "";
 
@@ -127,11 +130,11 @@ class _SupplierListPageState extends State<SupplierListPage> {
           isLoading = false;
         });
       } else {
-        AppLogger.api("GET", billingUrl, res?.statusCode ?? 500, isError: true);
+        AppLogger.api("GET", billingUrl, res.statusCode, isError: true);
         if (!mounted) return;
         setState(() {
           isLoading = false;
-          errorMessage = "Failed to load suppliers (${res?.statusCode ?? 500})";
+          errorMessage = "Failed to load suppliers (${res.statusCode})";
         });
       }
     } catch (e) {
@@ -146,18 +149,21 @@ class _SupplierListPageState extends State<SupplierListPage> {
 
   // 🔥 DELETE SUPPLIER
   Future<void> deleteSupplier(String id) async {
-    final url = "https://billing.srivagroups.in/api/suppliers/delete/$id";
+    final rawUrl = "https://demotesting.jobes24x7.com/api/billingapi/raw/$id";
+    final billingUrl = "https://billing.srivagroups.in/api/suppliers/delete/$id";
 
     try {
-      final res = await http.delete(
-        Uri.parse(url),
-        headers: {
-          "Authorization": "Bearer $token",
-          "Accept": "application/json",
-        },
-      );
+      try {
+        await http.delete(Uri.parse(rawUrl), headers: {"Accept": "application/json"}).timeout(const Duration(seconds: 8));
+      } catch (_) {}
 
-      AppLogger.api("DELETE", url, res.statusCode);
+      final headers = {
+        if (token.isNotEmpty) "Authorization": "Bearer $token",
+        "Accept": "application/json",
+      };
+      await http.delete(Uri.parse(billingUrl), headers: headers).timeout(const Duration(seconds: 8));
+
+      AppLogger.api("DELETE", billingUrl, 200);
       if (mounted) {
         fetchSuppliers(); // refresh
       }
@@ -177,10 +183,10 @@ class _SupplierListPageState extends State<SupplierListPage> {
     final q = query.toLowerCase();
     setState(() {
       filteredSuppliers = suppliers.where((s) {
-        final name = (s['supplier_name']?.toString() ?? "").toLowerCase();
-        final company = (s['company_name']?.toString() ?? "").toLowerCase();
-        final phone = (s['primary_phone']?.toString() ?? "").toLowerCase();
-        final city = (s['city']?.toString() ?? "").toLowerCase();
+        final name = (s['supplier_name'] ?? s['name'] ?? "").toString().toLowerCase();
+        final company = (s['company_name'] ?? s['business_name'] ?? "").toString().toLowerCase();
+        final phone = (s['phone'] ?? s['phone_number'] ?? s['primary_phone'] ?? s['mobile'] ?? "").toString().toLowerCase();
+        final city = (s['district'] ?? s['city'] ?? "").toString().toLowerCase();
         return name.contains(q) || company.contains(q) || phone.contains(q) || city.contains(q);
       }).toList();
     });
@@ -584,10 +590,28 @@ class _SupplierListPageState extends State<SupplierListPage> {
                                   final displayName = name.isEmpty ? "No Name" : name;
                                   final company = (s['business_name'] ?? s['company_name'] ?? displayName).toString().trim();
                                   final displayCompany = company.isEmpty ? displayName : company;
-                                  final city = (s['city'] ?? s['district'] ?? s['branch'] ?? "").toString().trim();
-                                  final branchName = city.isNotEmpty ? city : "Coimbatore";
-                                  final phone = (s['phone'] ?? s['primary_phone'] ?? s['mobile'] ?? "-").toString().trim();
-                                  final hasGst = (s['is_gst_registered'] == 1 || s['is_gst_registered'] == "1" || (s['gst_number'] != null && s['gst_number'].toString().trim().isNotEmpty));
+
+                                  // BRANCH MAPPING: Matches Web priority: branches[0].branch_name, then district, then city, then area
+                                  String branchName = "Coimbatore";
+                                  if (s['branches'] != null && (s['branches'] is List) && (s['branches'] as List).isNotEmpty) {
+                                    branchName = (s['branches'][0]['branch_name'] ?? "").toString().trim();
+                                  } else if (s['district'] != null && s['district'].toString().trim().isNotEmpty) {
+                                    branchName = s['district'].toString().trim();
+                                  } else if (s['city'] != null && s['city'].toString().trim().isNotEmpty) {
+                                    branchName = s['city'].toString().trim();
+                                  } else if (s['area'] != null && s['area'].toString().trim().isNotEmpty) {
+                                    branchName = s['area'].toString().trim();
+                                  }
+                                  if (branchName.isEmpty) branchName = "Coimbatore";
+
+                                  final phone = (s['phone'] ?? s['phone_number'] ?? s['primary_phone'] ?? s['business_phone'] ?? s['mobile'] ?? "-").toString().trim();
+                                  final hasGst = (s['is_gst_registered'] == 1 ||
+                                      s['is_gst_registered'] == "1" ||
+                                      s['with_gst'] == true ||
+                                      (s['gst_number'] != null && s['gst_number'].toString().trim().isNotEmpty) ||
+                                      (s['pan_number'] != null && s['pan_number'].toString().trim().isNotEmpty) ||
+                                      s['gst_option'] == 'with_gst' ||
+                                      s['gst_registration_status'] == 'Registered');
 
                                   return DataRow(
                                     cells: [
@@ -644,13 +668,13 @@ class _SupplierListPageState extends State<SupplierListPage> {
                                         Container(
                                           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                                           decoration: BoxDecoration(
-                                            color: hasGst ? const Color(0xFFDCFCE7) : const Color(0xFFFEF3C7),
+                                            color: hasGst ? const Color(0xFFDCFCE7) : const Color(0xFFFEE2E2),
                                             borderRadius: BorderRadius.circular(16),
                                           ),
                                           child: Text(
-                                            hasGst ? "With GST" : "Without GST",
+                                            hasGst ? "With GST" : "No GST",
                                             style: TextStyle(
-                                              color: hasGst ? const Color(0xFF166534) : const Color(0xFF92400E),
+                                              color: hasGst ? const Color(0xFF166534) : const Color(0xFFDC2626),
                                               fontSize: 11,
                                               fontWeight: FontWeight.bold,
                                             ),

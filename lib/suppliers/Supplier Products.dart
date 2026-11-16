@@ -440,12 +440,14 @@ class _SupplierProductsPageState extends State<SupplierProductsPage> with Suppli
         final cName = (item['category_name'] ?? "").toString().toLowerCase();
         final bName = (item['brand'] ?? "").toString().toLowerCase();
         final pName = (item['product_name'] ?? "").toString().toLowerCase();
-        if (!sName.contains(q) && !cName.contains(q) && !bName.contains(q) && !pName.contains(q)) return false;
+        final vName = (item['variant'] ?? "").toString().toLowerCase();
+        if (!sName.contains(q) && !cName.contains(q) && !bName.contains(q) && !pName.contains(q) && !vName.contains(q)) return false;
       }
-      if (filterMode == "By Category" && (item['category_name'] == null || item['category_name'].toString().isEmpty)) {
+      final itemMode = (item['mode'] ?? item['type'] ?? "").toString().toUpperCase();
+      if (filterMode == "By Category" && itemMode != "CATEGORY") {
         return false;
       }
-      if (filterMode == "By Product" && (item['product_name'] == null || item['product_name'].toString().isEmpty)) {
+      if (filterMode == "By Product" && itemMode != "PRODUCT") {
         return false;
       }
       return true;
@@ -810,10 +812,23 @@ class _SupplierProductsPageState extends State<SupplierProductsPage> with Suppli
                                   Container(
                                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                                     decoration: BoxDecoration(
-                                      color: const Color(0xFFDCFCE7),
+                                      color: (item['mode'] ?? item['type'] ?? "").toString().toUpperCase() == "CATEGORY"
+                                          ? const Color(0xFFEFF6FF)
+                                          : const Color(0xFFDCFCE7),
                                       borderRadius: BorderRadius.circular(4),
                                     ),
-                                    child: const Text("PRODUCT", style: TextStyle(color: Color(0xFF166534), fontSize: 10, fontWeight: FontWeight.bold)),
+                                    child: Text(
+                                      (item['mode'] ?? item['type'] ?? "Category").toString().toUpperCase() == "CATEGORY"
+                                          ? "CATEGORY"
+                                          : "PRODUCT",
+                                      style: TextStyle(
+                                        color: (item['mode'] ?? item['type'] ?? "").toString().toUpperCase() == "CATEGORY"
+                                            ? const Color(0xFF1D4ED8)
+                                            : const Color(0xFF166534),
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
                                   ),
                                 ),
                                 DataCell(

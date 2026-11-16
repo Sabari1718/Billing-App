@@ -40,19 +40,7 @@ class _CreateSupplierServicePageState extends State<CreateSupplierServicePage> {
   List<Map<String, dynamic>> supplierCategoryRecords = List<Map<String, dynamic>>.from(kLiveSupplierCategoryData);
   List<Map<String, dynamic>> supplierProductRecords = List<Map<String, dynamic>>.from(kLiveSupplierProductData);
 
-  List<Map<String, dynamic>> registeredServices = [
-    {
-      "id": "10",
-      "service_code": "SRV-8874",
-      "service_name": "AK",
-      "supplier": "YUDESH (ABD)",
-      "type": "One-Time Repair",
-      "status": "Active",
-      "contact": "9876543210 / yudeshprasath@gmail.com",
-      "location": "12, 2W, SD, CCC, 1QW, 1234567",
-      "description": "Standard chip level diagnostic & repair",
-    }
-  ];
+  List<Map<String, dynamic>> registeredServices = [];
 
   @override
   void initState() {
@@ -183,28 +171,31 @@ class _CreateSupplierServicePageState extends State<CreateSupplierServicePage> {
 
       if (res.statusCode == 200) {
         final decoded = jsonDecode(res.body);
-        final list = decoded['data'] is List ? decoded['data'] as List : [];
-        if (list.isNotEmpty) {
-          final List<Map<String, dynamic>> parsed = [];
-          for (var item in list) {
-            parsed.add({
-              "id": item['id']?.toString() ?? "",
-              "service_code": item['service_code'] ?? "-",
-              "service_name": item['service_name'] ?? "-",
-              "supplier": item['supplier_name'] ?? item['supplier'] ?? "-",
-              "supplier_id": item['supplier_id'],
-              "type": item['service_type'] ?? "One-Time Repair",
-              "status": (item['status']?.toString().toLowerCase() == "active") ? "Active" : "Inactive",
-              "contact": item['contact_details'] ?? "-",
-              "location": item['location_address'] ?? "-",
-              "description": item['service_description_terms'] ?? "",
-            });
-          }
-          if (mounted) {
-            setState(() {
-              registeredServices = parsed;
-            });
-          }
+        List list = [];
+        if (decoded is List) {
+          list = decoded;
+        } else if (decoded is Map) {
+          list = decoded['data'] is List ? decoded['data'] : (decoded['result'] is List ? decoded['result'] : []);
+        }
+        final List<Map<String, dynamic>> parsed = [];
+        for (var item in list) {
+          parsed.add({
+            "id": item['id']?.toString() ?? "",
+            "service_code": item['service_code'] ?? "-",
+            "service_name": item['service_name'] ?? "-",
+            "supplier": item['supplier_name'] ?? item['supplier'] ?? "-",
+            "supplier_id": item['supplier_id'],
+            "type": item['service_type'] ?? "One-Time Repair",
+            "status": (item['status']?.toString().toLowerCase() == "active") ? "Active" : "Inactive",
+            "contact": item['contact_details'] ?? "-",
+            "location": item['location_address'] ?? "-",
+            "description": item['service_description_terms'] ?? "",
+          });
+        }
+        if (mounted) {
+          setState(() {
+            registeredServices = parsed;
+          });
         }
       }
     } catch (e) {

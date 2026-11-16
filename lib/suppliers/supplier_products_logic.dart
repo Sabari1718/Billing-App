@@ -306,19 +306,36 @@ mixin SupplierProductsLogic on State<SupplierProductsPage> {
           final suppId = group['supplier_id']?.toString() ?? "";
           final realSuppName = getSupplierName(suppId);
           final items = group['list'] is List ? group['list'] as List : [];
-          for (var item in items) {
-            final catName = (item['name'] ?? "General").toString();
-            final brandName = (item['brand']?['name'] != null && item['brand']['name'].toString().trim().isNotEmpty)
-                ? item['brand']['name'].toString().trim()
-                : (catName == "2 Yard Power Cable" ? "Assembled" : "Imported");
+          if (items.isNotEmpty) {
+            for (var item in items) {
+              final catName = (item['name'] ?? "General").toString();
+              final brandName = (item['brand']?['name'] != null && item['brand']['name'].toString().trim().isNotEmpty)
+                  ? item['brand']['name'].toString().trim()
+                  : (catName == "2 Yard Power Cable" ? "Assembled" : "Imported");
+              combinedMappings.add({
+                "id": item['id'] ?? DateTime.now().millisecondsSinceEpoch,
+                "mode": "CATEGORY",
+                "type": "Category",
+                "supplier_id": suppId,
+                "supplier_name": realSuppName,
+                "category_name": catName,
+                "brand": brandName,
+                "product_name": item['name'] ?? "",
+                "variant": brandName,
+              });
+            }
+          } else {
+            final catName = (group['category_name'] ?? group['name'] ?? "General").toString();
+            final brandName = (group['brand_name'] ?? group['brand'] ?? "Imported").toString();
             combinedMappings.add({
-              "id": item['id'] ?? DateTime.now().millisecondsSinceEpoch,
-              "mode": "PRODUCT",
+              "id": group['id'] ?? DateTime.now().millisecondsSinceEpoch,
+              "mode": "CATEGORY",
+              "type": "Category",
               "supplier_id": suppId,
               "supplier_name": realSuppName,
               "category_name": catName,
               "brand": brandName,
-              "product_name": item['name'] ?? "",
+              "product_name": catName,
               "variant": brandName,
             });
           }
@@ -356,6 +373,7 @@ mixin SupplierProductsLogic on State<SupplierProductsPage> {
           combinedMappings.add({
             "id": p['id'] ?? DateTime.now().millisecondsSinceEpoch,
             "mode": "PRODUCT",
+            "type": "Product",
             "supplier_id": p['supplier_id']?.toString() ?? "",
             "supplier_name": realSuppName,
             "category_name": p['category_name'] ?? p['category'] ?? "General",
@@ -378,9 +396,11 @@ mixin SupplierProductsLogic on State<SupplierProductsPage> {
     // Default to full 67 live DB products if API returned empty or failed
     if (combinedMappings.isEmpty) {
       for (var p in kLiveSupplierProductData) {
+        final isCat = (p['mode'] ?? p['type'] ?? "").toString().toUpperCase() == "CATEGORY";
         combinedMappings.add({
           "id": p['id'],
-          "mode": "PRODUCT",
+          "mode": isCat ? "CATEGORY" : "PRODUCT",
+          "type": isCat ? "Category" : "Product",
           "supplier_id": p['supplier_id']?.toString() ?? "",
           "supplier_name": p['supplier_name'] ?? "Sheet Metal Fabricators",
           "category_name": p['category_name'] ?? "Development Boards",
