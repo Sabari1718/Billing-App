@@ -15,18 +15,26 @@ Future<Map<String, String>> _getStockHeaders() async {
       '';
   final businessId = prefs.getString('selected_business_id') ??
       prefs.get('business_id')?.toString() ??
-      '52';
+      '';
   final storeId = prefs.getString('selected_store_id') ??
       prefs.get('store_id')?.toString() ??
-      '38';
+      '';
+  final platformId = prefs.getString('selected_platform_id') ??
+      prefs.get('platform_id')?.toString() ??
+      '1';
 
   return {
     'Content-Type': 'application/json',
     'Accept': 'application/json',
     if (token.isNotEmpty) 'Authorization': token.startsWith('Bearer ') ? token : 'Bearer $token',
-    'x-business-id': businessId,
-    'x-store-id': storeId,
-    'x-platform-id': '1',
+    if (businessId.isNotEmpty) ...{
+      'x-business-id': businessId,
+      'business_id': businessId,
+      'account_id': businessId,
+      'id': businessId,
+    },
+    if (storeId.isNotEmpty) 'x-store-id': storeId,
+    if (platformId.isNotEmpty) 'x-platform-id': platformId,
   };
 }
 
@@ -34,14 +42,17 @@ Future<Map<String, String>> _getStockScope() async {
   final prefs = await SharedPreferences.getInstance();
   final businessId = prefs.getString('selected_business_id') ??
       prefs.get('business_id')?.toString() ??
-      '52';
+      '';
   final storeId = prefs.getString('selected_store_id') ??
       prefs.get('store_id')?.toString() ??
-      '38';
+      '';
+  final platformId = prefs.getString('selected_platform_id') ??
+      prefs.get('platform_id')?.toString() ??
+      '1';
   return {
     'business_id': businessId,
     'store_id': storeId,
-    'platform_id': '1',
+    'platform_id': platformId,
   };
 }
 

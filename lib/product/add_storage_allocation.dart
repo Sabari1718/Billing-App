@@ -133,17 +133,22 @@ class _AddStorageAllocationPageState extends State<AddStorageAllocationPage> {
         prefs.getString("access_token") ??
         "";
     if (token.startsWith("Bearer ")) token = token.substring(7).trim();
-    final businessId = prefs.getString('selected_business_id') ?? prefs.get('business_id')?.toString() ?? '52';
-    final storeId = prefs.getString('selected_store_id') ?? prefs.get('store_id')?.toString() ?? '38';
-    final platformId = prefs.getString('platform_id') ?? '1';
+    final businessId = prefs.getString('selected_business_id') ?? prefs.get('business_id')?.toString() ?? '';
+    final storeId = prefs.getString('selected_store_id') ?? prefs.get('store_id')?.toString() ?? '';
+    final platformId = prefs.getString('selected_platform_id') ?? prefs.get('platform_id')?.toString() ?? '1';
 
     return {
       "Accept": "application/json",
       "Content-Type": "application/json",
       "X-App-ID": "Product94674",
-      "x-business-id": businessId,
-      "x-store-id": storeId,
-      "x-platform-id": platformId,
+      if (businessId.isNotEmpty) ...{
+        "x-business-id": businessId,
+        "business_id": businessId,
+        "account_id": businessId,
+        "id": businessId,
+      },
+      if (storeId.isNotEmpty) "x-store-id": storeId,
+      if (platformId.isNotEmpty) "x-platform-id": platformId,
       if (token.isNotEmpty) "Authorization": "Bearer $token",
     };
   }

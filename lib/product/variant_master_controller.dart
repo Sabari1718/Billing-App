@@ -49,15 +49,15 @@ class VariantMasterController extends GetxController {
 
     final bId = prefs.getString('selected_business_id') ??
         prefs.get('business_id')?.toString() ??
-        '52';
+        '';
     final sId = prefs.getString('selected_store_id') ??
         prefs.get('store_id')?.toString() ??
-        '38';
+        '';
     final pId = prefs.getString('selected_platform_id') ??
         prefs.get('platform_id')?.toString() ??
         '1';
 
-    final headers = {
+    final headers = <String, String>{
       'Accept': 'application/json',
       'Content-Type': 'application/json',
       'X-App-ID': 'Product94674',
@@ -68,6 +68,9 @@ class VariantMasterController extends GetxController {
     }
     if (bId.isNotEmpty) {
       headers['x-business-id'] = bId;
+      headers['business_id'] = bId;
+      headers['account_id'] = bId;
+      headers['id'] = bId;
     }
     if (sId.isNotEmpty) {
       headers['x-store-id'] = sId;
@@ -117,16 +120,16 @@ class VariantMasterController extends GetxController {
     final prefs = await SharedPreferences.getInstance();
     final bId = int.tryParse(prefs.getString('selected_business_id') ??
             prefs.get('business_id')?.toString() ??
-            '52') ??
-        52;
+            '') ??
+        0;
     final pId = int.tryParse(prefs.getString('selected_platform_id') ??
             prefs.get('platform_id')?.toString() ??
             '1') ??
         1;
     final sId = int.tryParse(prefs.getString('selected_store_id') ??
             prefs.get('store_id')?.toString() ??
-            '38') ??
-        38;
+            '') ??
+        0;
 
     return {
       'business_id': bId,

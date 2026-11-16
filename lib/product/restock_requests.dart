@@ -465,29 +465,30 @@ class _RestockRequestsPageState extends State<RestockRequestsPage> {
         '';
     final businessId = prefs.getString('selected_business_id') ??
         prefs.get('business_id')?.toString() ??
-        '52';
+        '';
     String storeId = prefs.getString('selected_store_id') ??
         prefs.get('store_id')?.toString() ??
-        '38';
-    if (storeId == '1' || storeId.isEmpty) {
-      storeId = '38';
-    }
+        '';
 
     return {
       'Content-Type': 'application/json',
       'Accept': 'application/json',
       'X-App-ID': 'Product94674',
       if (token.isNotEmpty) 'Authorization': token.startsWith('Bearer ') ? token : 'Bearer $token',
-      'x-business-id': businessId,
-      'x-store-id': storeId,
+      if (businessId.isNotEmpty) ...{
+        'x-business-id': businessId,
+        'business_id': businessId,
+        'account_id': businessId,
+        'id': businessId,
+      },
+      if (storeId.isNotEmpty) 'x-store-id': storeId,
       'x-platform-id': '1',
     };
   }
 
   Future<String> _getStoreId() async {
     final prefs = await SharedPreferences.getInstance();
-    String sId = prefs.getString('selected_store_id') ?? prefs.get('store_id')?.toString() ?? '38';
-    if (sId == '1' || sId.isEmpty) sId = '38';
+    String sId = prefs.getString('selected_store_id') ?? prefs.get('store_id')?.toString() ?? '';
     return sId;
   }
 

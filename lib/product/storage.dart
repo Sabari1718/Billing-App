@@ -16,18 +16,23 @@ Future<Map<String, String>> _getStorageApiHeaders() async {
   final cleanToken = token.startsWith("Bearer ") ? token.substring(7).trim() : token.trim();
   final businessId = prefs.getString("selected_business_id") ??
       prefs.get("business_id")?.toString() ??
-      "52";
+      "";
   final storeId = prefs.getString("selected_store_id") ??
       prefs.get("store_id")?.toString() ??
-      "38";
+      "";
 
   return {
     "Accept": "application/json",
     "Content-Type": "application/json",
     "X-App-ID": "Product94674",
     if (cleanToken.isNotEmpty) "Authorization": "Bearer $cleanToken",
-    "x-business-id": businessId,
-    "x-store-id": (storeId == '1' || storeId.isEmpty) ? '38' : storeId,
+    if (businessId.isNotEmpty) ...{
+      "x-business-id": businessId,
+      "business_id": businessId,
+      "account_id": businessId,
+      "id": businessId,
+    },
+    if (storeId.isNotEmpty) "x-store-id": storeId,
     "x-platform-id": "1",
   };
 }

@@ -55,44 +55,106 @@ class _StockStatusPageState extends State<StockStatusPage> {
         '';
     final businessId = prefs.getString('selected_business_id') ??
         prefs.get('business_id')?.toString() ??
-        '52';
-    String storeId = prefs.getString('selected_store_id') ??
+        '';
+    final storeId = prefs.getString('selected_store_id') ??
         prefs.get('store_id')?.toString() ??
-        '38';
-    if (storeId == '1' || storeId.isEmpty) {
-      storeId = '38';
-    }
+        '';
+    final platformId = prefs.getString('selected_platform_id') ??
+        prefs.get('platform_id')?.toString() ??
+        '1';
 
     return {
       'Content-Type': 'application/json',
       'Accept': 'application/json',
       if (token.isNotEmpty) 'Authorization': token.startsWith('Bearer ') ? token : 'Bearer $token',
-      'x-business-id': businessId,
-      'x-store-id': storeId,
-      'x-platform-id': '1',
+      if (businessId.isNotEmpty) ...{
+        'x-business-id': businessId,
+        'business_id': businessId,
+        'account_id': businessId,
+        'id': businessId,
+      },
+      if (storeId.isNotEmpty) 'x-store-id': storeId,
+      if (platformId.isNotEmpty) 'x-platform-id': platformId,
     };
   }
 
-  Future<Map<String, String>> _getScope() async {
-    final prefs = await SharedPreferences.getInstance();
-    final businessId = prefs.getString('selected_business_id') ??
-        prefs.get('business_id')?.toString() ??
-        '52';
-    String storeId = prefs.getString('selected_store_id') ??
-        prefs.get('store_id')?.toString() ??
-        '38';
-    if (storeId == '1' || storeId.isEmpty) {
-      storeId = '38';
+  String _getProductName(Map<String, dynamic> item) {
+    final rawName = item['product_name'] ??
+        item['name'] ??
+        item['productName'] ??
+        item['title'] ??
+        item['Product name'];
+    if (rawName != null && rawName.toString().trim().isNotEmpty) {
+      return rawName.toString().trim();
     }
-    return {
-      'business_id': businessId,
-      'store_id': storeId,
-      'platform_id': '1',
-    };
+    if (item['product'] is Map) {
+      final p = item['product'] as Map;
+      final pName = p['product_name'] ?? p['name'] ?? p['productName'] ?? p['title'];
+      if (pName != null && pName.toString().trim().isNotEmpty) {
+        return pName.toString().trim();
+      }
+    }
+    if (item['product'] is String && (item['product'] as String).trim().isNotEmpty) {
+      return (item['product'] as String).trim();
+    }
+    return "Unknown Product";
+  }
+
+  String _getSupplierName(Map<String, dynamic> item) {
+    final rawSupp = item['Supplier name'] ??
+        item['supplier_name'] ??
+        item['supplier']?['supplier_name'] ??
+        item['supplier']?['name'] ??
+        (item['supplier'] is String ? item['supplier'] : null);
+    if (rawSupp != null && rawSupp.toString().trim().isNotEmpty) {
+      return rawSupp.toString().trim();
+    }
+    return "-";
+  }
+
+  int _getItemQty(Map<String, dynamic> item) {
+    // Top-level numeric qty check (matches Web v(e))
+    final rawQty = item['variant_qty'] ??
+        item['total_qty'] ??
+        item['qty'] ??
+        item['quantity'] ??
+        item['stock'] ??
+        item['stock_qty'] ??
+        item['available_qty'] ??
+        item['total_stock'];
+
+    if (rawQty != null && rawQty.toString().trim().isNotEmpty) {
+      final parsed = int.tryParse(rawQty.toString());
+      if (parsed != null) return parsed;
+      final parsedD = double.tryParse(rawQty.toString());
+      if (parsedD != null) return parsedD.toInt();
+    }
+
+    if (item['product'] is Map) {
+      final p = item['product'] as Map;
+      final pQty = p['qty'] ?? p['quantity'] ?? p['stock'];
+      if (pQty != null && pQty.toString().trim().isNotEmpty) {
+        final parsed = int.tryParse(pQty.toString());
+        if (parsed != null) return parsed;
+      }
+    }
+
+    if (item['variants'] is List && (item['variants'] as List).isNotEmpty) {
+      int sumV = 0;
+      for (var v in item['variants']) {
+        if (v is Map) {
+          final vq = int.tryParse(v['qty']?.toString() ?? v['quantity']?.toString() ?? '0') ?? 0;
+          sumV += vq;
+        }
+      }
+      if (sumV > 0) return sumV;
+    }
+
+    return 0;
   }
 
   // -----------------------------------------------------------------------
-  // FETCH STOCKS (GET /api/stocks)
+  // FETCH STOCKS (Matches Web Application Jc() & gl() fallback)
   // -----------------------------------------------------------------------
   Future<void> _fetchStockStatus() async {
     if (!mounted) return;
@@ -103,78 +165,94 @@ class _StockStatusPageState extends State<StockStatusPage> {
 
     try {
       final headers = await _getHeaders();
-      final scope = await _getScope();
-      final bId = scope['business_id']!;
-      final sId = scope['store_id']!;
 
-      final url = "https://billing.srivagroups.in/api/stocks?business_id=$bId&store_id=$sId&platform_id=1";
-      final res = await http.get(Uri.parse(url), headers: headers);
-      debugPrint("StockStatus fetchStocks [${res.statusCode}]: ${res.body.length} chars");
+      List<Map<String, dynamic>> items = [];
 
-      if (res.statusCode == 200) {
-        final decoded = jsonDecode(res.body);
-        final rawData = decoded['data'];
+      // 1. First fetch /api/stocks (stripping query params matching Web Jc())
+      try {
+        final res = await http.get(
+          Uri.parse("https://billing.srivagroups.in/api/stocks"),
+          headers: headers,
+        );
+        debugPrint("StockStatus /api/stocks [${res.statusCode}]: ${res.body.length} chars");
+        if (res.statusCode == 200) {
+          final decoded = jsonDecode(res.body);
+          final rawData = decoded['data']?['stocks'] ?? decoded['data'];
+          if (rawData is List && rawData.isNotEmpty) {
+            for (var it in rawData) {
+              if (it is Map) {
+                final m = Map<String, dynamic>.from(it);
+                m['source_type'] = 'stocks';
+                items.add(m);
+              }
+            }
+          }
+        }
+      } catch (e) {
+        debugPrint("StockStatus /api/stocks error: $e");
+      }
 
-        List<Map<String, dynamic>> items = [];
-        if (rawData is List) {
-          for (var item in rawData) {
-            if (item is Map) {
-              final mapItem = Map<String, dynamic>.from(item);
-              final itemStoreId = (mapItem['store_id'] ?? mapItem['store']?['id'])?.toString();
-              // If item has a specific store_id, filter to match current active store 38
-              if (itemStoreId != null && itemStoreId.isNotEmpty && itemStoreId != '0') {
-                if (itemStoreId != sId) {
-                  continue;
+      // 2. If empty, fallback to /api/w_variant/stock (matches Web gl())
+      if (items.isEmpty) {
+        try {
+          final wRes = await http.get(
+            Uri.parse("https://billing.srivagroups.in/api/w_variant/stock"),
+            headers: headers,
+          );
+          debugPrint("StockStatus /api/w_variant/stock [${wRes.statusCode}]: ${wRes.body.length} chars");
+          if (wRes.statusCode == 200) {
+            final decoded = jsonDecode(wRes.body);
+            final rawData = decoded['data'];
+            if (rawData is List && rawData.isNotEmpty) {
+              for (var it in rawData) {
+                if (it is Map) {
+                  final m = Map<String, dynamic>.from(it);
+                  m['source_type'] = 'w_variant';
+                  items.add(m);
                 }
               }
-              items.add(mapItem);
             }
           }
+        } catch (e) {
+          debugPrint("StockStatus /api/w_variant/stock error: $e");
+        }
+      }
+
+      // Calculate Stats matching Web App index-CHrl0SPe.js:
+      int sumQty = 0;
+      int lowCount = 0;
+      int outCount = 0;
+      final Set<String> uniqueSuppliers = {"All Suppliers"};
+
+      for (var item in items) {
+        final q = _getItemQty(item);
+        sumQty += q;
+
+        if (q == 0) {
+          outCount++;
+        } else if (q > 0 && q <= 5) {
+          lowCount++;
         }
 
-        // Calculate Stats
-        int sumQty = 0;
-        int lowCount = 0;
-        int outCount = 0;
-        final Set<String> uniqueSuppliers = {"All Suppliers"};
+        final supp = _getSupplierName(item);
+        if (supp.isNotEmpty && supp != "-" && supp != "Unknown Supplier") {
+          uniqueSuppliers.add(supp);
+        }
+      }
 
-        for (var item in items) {
-          final q = int.tryParse(item['total_qty']?.toString() ?? '0') ?? 0;
-          sumQty += q;
-
-          if (q <= 0) {
-            outCount++;
-          } else if (q < 50) {
-            lowCount++;
+      if (mounted) {
+        setState(() {
+          allStocks = items;
+          totalItems = items.length;
+          totalQty = sumQty;
+          lowStockCount = lowCount;
+          outOfStockCount = outCount;
+          suppliersList = uniqueSuppliers.toList();
+          if (!suppliersList.contains(selectedSupplier)) {
+            selectedSupplier = "All Suppliers";
           }
-
-          // Supplier name
-          final supp = item['supplier'];
-          if (supp is Map && supp['name'] != null && supp['name'].toString().trim().isNotEmpty) {
-            uniqueSuppliers.add(supp['name'].toString().trim());
-          }
-        }
-
-        if (mounted) {
-          setState(() {
-            allStocks = items;
-            totalItems = items.length;
-            totalQty = sumQty;
-            lowStockCount = lowCount;
-            outOfStockCount = outCount;
-            suppliersList = uniqueSuppliers.toList();
-            if (!suppliersList.contains(selectedSupplier)) {
-              selectedSupplier = "All Suppliers";
-            }
-            currentPage = 1;
-          });
-        }
-      } else {
-        if (mounted) {
-          setState(() {
-            errorMessage = "Failed to load stocks (status: ${res.statusCode})";
-          });
-        }
+          currentPage = 1;
+        });
       }
     } catch (e) {
       debugPrint("StockStatus fetch error: $e");
@@ -191,11 +269,12 @@ class _StockStatusPageState extends State<StockStatusPage> {
   }
 
   // -----------------------------------------------------------------------
-  // DELETE STOCK (DELETE /api/stocks/{id})
+  // DELETE STOCK (DELETE /api/w_variant/stock/{id} or /api/stocks/{id})
   // -----------------------------------------------------------------------
   void _confirmDelete(Map<String, dynamic> item) {
-    final pName = item['product_name'] ?? item['product'] ?? "this product";
+    final pName = _getProductName(item);
     final stockId = item['id'];
+    final isWVariant = item['source_type'] == 'w_variant' || item['price'] != null;
 
     showDialog(
       context: context,
@@ -220,12 +299,11 @@ class _StockStatusPageState extends State<StockStatusPage> {
               Navigator.pop(ctx);
               try {
                 final headers = await _getHeaders();
-                final scope = await _getScope();
-                final bId = scope['business_id']!;
-                final sId = scope['store_id']!;
+                final delUrl = isWVariant
+                    ? "https://billing.srivagroups.in/api/w_variant/stock/$stockId"
+                    : "https://billing.srivagroups.in/api/stocks/$stockId";
 
-                final url = "https://billing.srivagroups.in/api/stocks/$stockId?business_id=$bId&store_id=$sId&platform_id=1";
-                final res = await http.delete(Uri.parse(url), headers: headers);
+                final res = await http.delete(Uri.parse(delUrl), headers: headers);
 
                 if (res.statusCode >= 200 && res.statusCode < 300) {
                   if (mounted) {
@@ -263,11 +341,11 @@ class _StockStatusPageState extends State<StockStatusPage> {
 
   @override
   Widget build(BuildContext context) {
-    // Filter items
+    // Filter items matching Web App logic
     final filtered = allStocks.where((item) {
-      final pName = (item['product_name'] ?? item['product'] ?? '').toString().toLowerCase();
-      final pCode = (item['product_code'] ?? '').toString().toLowerCase();
-      final supp = (item['supplier'] is Map ? item['supplier']['name'] : item['supplier'])?.toString().toLowerCase() ?? '';
+      final pName = _getProductName(item).toLowerCase();
+      final pCode = (item['product_code'] ?? item['sku'] ?? '').toString().toLowerCase();
+      final supp = _getSupplierName(item).toLowerCase();
 
       // Search Query
       if (searchQuery.isNotEmpty) {
@@ -279,18 +357,17 @@ class _StockStatusPageState extends State<StockStatusPage> {
 
       // Supplier Filter
       if (selectedSupplier != "All Suppliers") {
-        final itemSupp = (item['supplier'] is Map ? item['supplier']['name'] : item['supplier'])?.toString().trim() ?? '';
-        if (itemSupp.toLowerCase() != selectedSupplier.toLowerCase()) {
+        if (supp.toLowerCase() != selectedSupplier.toLowerCase()) {
           return false;
         }
       }
 
-      // Stock Status Filter
-      final q = int.tryParse(item['total_qty']?.toString() ?? '0') ?? 0;
-      if (selectedStatusFilter == "In Stock" && q < 50) {
+      // Stock Status Filter (Matches Web: In Stock: > 5, Low Stock: 1..5, Out of Stock: 0)
+      final q = _getItemQty(item);
+      if (selectedStatusFilter == "In Stock" && q <= 5) {
         return false;
       }
-      if (selectedStatusFilter == "Low Stock" && (q <= 0 || q >= 50)) {
+      if (selectedStatusFilter == "Low Stock" && (q <= 0 || q > 5)) {
         return false;
       }
       if (selectedStatusFilter == "Out of Stock" && q > 0) {
@@ -633,13 +710,12 @@ class _StockStatusPageState extends State<StockStatusPage> {
                                     rows: List.generate(pagedItems.length, (idx) {
                                       final item = pagedItems[idx];
                                       final sNo = startIndex + idx + 1;
-                                      final pName = item['product_name'] ?? item['product'] ?? '-';
-                                      final brand = item['brand_name'] ?? (item['variants'] is List && (item['variants'] as List).isNotEmpty ? item['variants'][0]['variant_name'] : null) ?? 'Imported';
-                                      final suppName = item['supplier'] is Map ? (item['supplier']['name'] ?? '-') : (item['supplier']?.toString() ?? '-');
-                                      final qty = int.tryParse(item['total_qty']?.toString() ?? '0') ?? 0;
+                                      final pName = _getProductName(item);
+                                      final suppName = _getSupplierName(item);
+                                      final qty = _getItemQty(item);
 
                                       final isOut = qty <= 0;
-                                      final isLow = qty > 0 && qty < 50;
+                                      final isLow = qty > 0 && qty <= 5;
 
                                       Color qtyBg = const Color(0xFFECFDF5);
                                       Color qtyText = const Color(0xFF059669);
@@ -654,6 +730,8 @@ class _StockStatusPageState extends State<StockStatusPage> {
                                         qtyText = const Color(0xFFD97706);
                                         qtyIcon = Icons.warning_amber_rounded;
                                       }
+
+                                      final variants = (item['variants'] is List) ? (item['variants'] as List) : [];
 
                                       return DataRow(
                                         cells: [
@@ -671,19 +749,27 @@ class _StockStatusPageState extends State<StockStatusPage> {
                                                     overflow: TextOverflow.ellipsis,
                                                   ),
                                                 ),
-                                                const SizedBox(height: 4),
-                                                Container(
-                                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                                  decoration: BoxDecoration(
-                                                    color: const Color(0xFFEFF6FF),
-                                                    borderRadius: BorderRadius.circular(6),
-                                                    border: Border.all(color: const Color(0xFFBFDBFE)),
+                                                if (variants.isNotEmpty) ...[
+                                                  const SizedBox(height: 4),
+                                                  Wrap(
+                                                    spacing: 4,
+                                                    children: variants.map<Widget>((v) {
+                                                      final vTag = (v is Map) ? (v['variant_type'] ?? v['variant_name'] ?? v['name'] ?? 'Variant').toString() : 'Variant';
+                                                      return Container(
+                                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                                        decoration: BoxDecoration(
+                                                          color: const Color(0xFFEFF6FF),
+                                                          borderRadius: BorderRadius.circular(6),
+                                                          border: Border.all(color: const Color(0xFFBFDBFE)),
+                                                        ),
+                                                        child: Text(
+                                                          vTag,
+                                                          style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w600, color: const Color(0xFF2563EB)),
+                                                        ),
+                                                      );
+                                                    }).toList(),
                                                   ),
-                                                  child: Text(
-                                                    brand,
-                                                    style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w600, color: const Color(0xFF2563EB)),
-                                                  ),
-                                                ),
+                                                ],
                                               ],
                                             ),
                                           ),
