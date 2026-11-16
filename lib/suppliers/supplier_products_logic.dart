@@ -107,14 +107,17 @@ mixin SupplierProductsLogic on State<SupplierProductsPage> {
         final effectiveToken = widget.token.isNotEmpty 
             ? widget.token 
             : (prefs.getString("billing_auth_token") ?? prefs.getString("auth_token") ?? "");
-        res = await http.get(Uri.parse(billingUrl), headers: {
-          if (effectiveToken.isNotEmpty) "Authorization": "Bearer $effectiveToken",
-          "Accept": "application/json",
-        }).timeout(const Duration(seconds: 10));
+        try {
+          res = await http.get(Uri.parse(billingUrl), headers: {
+            if (effectiveToken.isNotEmpty) "Authorization": "Bearer $effectiveToken",
+            "Accept": "application/json",
+          }).timeout(const Duration(seconds: 10));
+        } catch (_) {}
       }
 
-      if (res.statusCode == 200) {
-        final decoded = jsonDecode(res.body);
+      final finalRes = res;
+      if (finalRes != null && finalRes.statusCode == 200) {
+        final decoded = jsonDecode(finalRes.body);
         List list = [];
         if (decoded is List) {
           list = decoded;

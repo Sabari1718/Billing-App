@@ -91,15 +91,22 @@ class _SupplierListPageState extends State<SupplierListPage> {
       }
 
       if (res == null || res.statusCode != 200) {
-        res = await http.get(Uri.parse(billingUrl), headers: headers).timeout(const Duration(seconds: 10));
+        try {
+          res = await http.get(Uri.parse(billingUrl), headers: headers).timeout(const Duration(seconds: 10));
+        } catch (e) {
+          AppLogger.error("Billing suppliers API failed", e);
+        }
       }
 
-      AppLogger.api("GET", res.request?.url.toString() ?? rawUrl, res.statusCode);
+      final finalRes = res;
+      if (finalRes != null) {
+        AppLogger.api("GET", finalRes.request?.url.toString() ?? rawUrl, finalRes.statusCode);
+      }
 
       if (!mounted) return;
 
-      if (res.statusCode == 200) {
-        final decoded = jsonDecode(res.body);
+      if (finalRes != null && finalRes.statusCode == 200) {
+        final decoded = jsonDecode(finalRes.body);
 
         if (!mounted) return;
         setState(() {
@@ -130,11 +137,12 @@ class _SupplierListPageState extends State<SupplierListPage> {
           isLoading = false;
         });
       } else {
-        AppLogger.api("GET", billingUrl, res.statusCode, isError: true);
+        final code = finalRes?.statusCode ?? 500;
+        AppLogger.api("GET", billingUrl, code, isError: true);
         if (!mounted) return;
         setState(() {
           isLoading = false;
-          errorMessage = "Failed to load suppliers (${res.statusCode})";
+          errorMessage = "Failed to load suppliers ($code)";
         });
       }
     } catch (e) {
