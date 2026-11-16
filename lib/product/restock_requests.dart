@@ -53,9 +53,37 @@ class _RestockRequestsPageState extends State<RestockRequestsPage> {
     "-- Select Business First --",
   ];
 
+  // View Switcher: Orders vs Process
+  bool isProcessView = false;
+
+  // Process View State (Photos 4 & 5)
+  bool isProcessGridView = false;
+  List<Map<String, dynamic>> processOrdersList = [];
+  bool isLoadingProcess = false;
+  String processSearchQuery = "";
+  String processSelectedTimeFilter = "All Time";
+  String processSelectedStatusFilter = "All Statuses";
+  String? processSupplierFilter;
+  int processCurrentPage = 1;
+  final int processPageSize = 10;
+  final TextEditingController processGoToPageCtrl = TextEditingController(text: "1");
+
+  final List<String> processTimeFilterOptions = [
+    "All Time",
+    "Today",
+    "This Week",
+    "This Month",
+  ];
+
+  final List<String> processStatusFilterOptions = [
+    "All Statuses",
+    "ACCEPT",
+    "PROGRESS",
+  ];
+
   // Top Metrics matching Web screenshots
-  int pendingRequestsCount = 998;
-  int acceptedOrdersCount = 2;
+  int pendingRequestsCount = 2;
+  int acceptedOrdersCount = 0;
   int completedRequestsCount = 0;
   int rejectedRequestsCount = 0;
 
@@ -83,6 +111,7 @@ class _RestockRequestsPageState extends State<RestockRequestsPage> {
   @override
   void dispose() {
     goToPageCtrl.dispose();
+    processGoToPageCtrl.dispose();
     super.dispose();
   }
 
@@ -90,19 +119,19 @@ class _RestockRequestsPageState extends State<RestockRequestsPage> {
   void _seedInitialRestockData() {
     autoRestockRequests = [
       {
-        "id": 2315,
+        "id": 2399,
         "s_no": 1,
-        "req_id": "AUTO-427735-402",
-        "product": "DC Power Supply Digital Male Cable Connector",
-        "code": "DCP-000-03385",
-        "supplier": "Supplier",
-        "supplier_id": "7000000036",
-        "business_id": "52",
-        "store_id": "38",
-        "req_qty": 5,
+        "req_id": "SAR-00425",
+        "product": "AO3401A Mosfet",
+        "code": "AO3-AO3-03435",
+        "supplier": "Saravana Electronics",
+        "supplier_id": "7000000015",
+        "business_id": "68",
+        "store_id": "61",
+        "req_qty": 7,
         "supplier_qty": "—",
-        "price": 25.0,
-        "previous_price": 25.0,
+        "price": 8.0,
+        "previous_price": 8.0,
         "current_stock": 2,
         "min_qty": 5,
         "type": "AUTO",
@@ -111,188 +140,20 @@ class _RestockRequestsPageState extends State<RestockRequestsPage> {
         "date": "10/27/2026",
       },
       {
-        "id": 2314,
+        "id": 2388,
         "s_no": 2,
-        "req_id": "SAR-00379",
-        "product": "2.0 USB Type B Female PCB Mount Jack Connector",
-        "code": "20U-000-03296",
+        "req_id": "AUTO-189203-729",
+        "product": "AO3401A Mosfet",
+        "code": "AO3-AO3-03435",
         "supplier": "Saravana Electronics",
         "supplier_id": "7000000015",
-        "business_id": "52",
-        "store_id": "38",
-        "req_qty": 3,
-        "supplier_qty": "—",
-        "price": 12.0,
-        "previous_price": 12.0,
-        "current_stock": 4,
-        "min_qty": 5,
-        "type": "AUTO",
-        "status": "Pending",
-        "po_number": "",
-        "date": "10/27/2026",
-      },
-      {
-        "id": 2313,
-        "s_no": 3,
-        "req_id": "SAR-00378",
-        "product": "CJMCU-6075 UV Light Intensity Sensor",
-        "code": "CJM-000-02882",
-        "supplier": "Saravana Electronics",
-        "supplier_id": "7000000015",
-        "business_id": "52",
-        "store_id": "38",
+        "business_id": "68",
+        "store_id": "61",
         "req_qty": 9,
         "supplier_qty": "—",
-        "price": 120.0,
-        "previous_price": 120.0,
-        "current_stock": 1,
-        "min_qty": 5,
-        "type": "AUTO",
-        "status": "Pending",
-        "po_number": "",
-        "date": "10/27/2026",
-      },
-      {
-        "id": 2312,
-        "s_no": 4,
-        "req_id": "SAR-00377",
-        "product": "COLOR Sensor TCS3200",
-        "code": "COL-000-01982",
-        "supplier": "Saravana Electronics",
-        "supplier_id": "7000000015",
-        "business_id": "52",
-        "store_id": "38",
-        "req_qty": 12,
-        "supplier_qty": "—",
-        "price": 85.0,
-        "previous_price": 85.0,
+        "price": 8.0,
+        "previous_price": 8.0,
         "current_stock": 0,
-        "min_qty": 5,
-        "type": "AUTO",
-        "status": "Pending",
-        "po_number": "",
-        "date": "10/27/2026",
-      },
-      {
-        "id": 2311,
-        "s_no": 5,
-        "req_id": "SAR-00376",
-        "product": "16x2 LCD Display Yellow Backlight",
-        "code": "LCD-000-01452",
-        "supplier": "Saravana Electronics",
-        "supplier_id": "7000000015",
-        "business_id": "52",
-        "store_id": "38",
-        "req_qty": 8,
-        "supplier_qty": "—",
-        "price": 140.0,
-        "previous_price": 140.0,
-        "current_stock": 3,
-        "min_qty": 5,
-        "type": "AUTO",
-        "status": "Pending",
-        "po_number": "",
-        "date": "10/27/2026",
-      },
-      {
-        "id": 2310,
-        "s_no": 6,
-        "req_id": "AUTO-473683-522",
-        "product": "HDMI to HDMI Pin",
-        "code": "HDM-000-03274",
-        "supplier": "Supplier",
-        "supplier_id": "7000000036",
-        "business_id": "52",
-        "store_id": "38",
-        "req_qty": 5,
-        "supplier_qty": "—",
-        "price": 30.0,
-        "previous_price": 30.0,
-        "current_stock": 5,
-        "min_qty": 5,
-        "type": "AUTO",
-        "status": "Pending",
-        "po_number": "",
-        "date": "10/27/2026",
-      },
-      {
-        "id": 2309,
-        "s_no": 7,
-        "req_id": "AUTO-429342-890",
-        "product": "3 PIN DIP SWITCH",
-        "code": "3PI-000-01924",
-        "supplier": "Supplier",
-        "supplier_id": "7000000036",
-        "business_id": "52",
-        "store_id": "38",
-        "req_qty": 50,
-        "supplier_qty": "—",
-        "price": 7.0,
-        "previous_price": 7.0,
-        "current_stock": 0,
-        "min_qty": 5,
-        "type": "AUTO",
-        "status": "Pending",
-        "po_number": "",
-        "date": "10/27/2026",
-      },
-      {
-        "id": 2308,
-        "s_no": 8,
-        "req_id": "SAR-00374",
-        "product": "IC AT89552",
-        "code": "ICA-000-02992",
-        "supplier": "Saravana Electronics",
-        "supplier_id": "7000000015",
-        "business_id": "52",
-        "store_id": "38",
-        "req_qty": 49,
-        "supplier_qty": "—",
-        "price": 70.0,
-        "previous_price": 70.0,
-        "current_stock": 1,
-        "min_qty": 5,
-        "type": "AUTO",
-        "status": "Pending",
-        "po_number": "",
-        "date": "10/27/2026",
-      },
-      {
-        "id": 2307,
-        "s_no": 9,
-        "req_id": "SAR-00373",
-        "product": "8 PIN DIP SWITCH",
-        "code": "8PI-000-01927",
-        "supplier": "Saravana Electronics",
-        "supplier_id": "7000000015",
-        "business_id": "52",
-        "store_id": "38",
-        "req_qty": 20,
-        "supplier_qty": "—",
-        "price": 7.0,
-        "previous_price": 7.0,
-        "current_stock": 5,
-        "min_qty": 5,
-        "type": "AUTO",
-        "status": "Pending",
-        "po_number": "",
-        "date": "10/27/2026",
-      },
-      {
-        "id": 2306,
-        "s_no": 10,
-        "req_id": "SAR-00372",
-        "product": "4 PIN DIP SWITCH",
-        "code": "4PI-000-01925",
-        "supplier": "Saravana Electronics",
-        "supplier_id": "7000000015",
-        "business_id": "52",
-        "store_id": "38",
-        "req_qty": 45,
-        "supplier_qty": "—",
-        "price": 7.0,
-        "previous_price": 7.0,
-        "current_stock": 5,
         "min_qty": 5,
         "type": "AUTO",
         "status": "Pending",
@@ -301,157 +162,72 @@ class _RestockRequestsPageState extends State<RestockRequestsPage> {
       },
     ];
 
-    manualRestockRequests = [
-      {
-        "id": 1001,
-        "s_no": 1,
-        "req_id": "MAN-894120-101",
-        "product": "12V 2A Power Adapter",
-        "code": "PWR-000-01042",
-        "supplier": "Saravana Electronics",
-        "supplier_id": "7000000015",
-        "business_id": "52",
-        "store_id": "38",
-        "req_qty": 25,
-        "supplier_qty": "25",
-        "price": 180.0,
-        "previous_price": 180.0,
-        "current_stock": 6,
-        "min_qty": 10,
-        "type": "MANUAL",
-        "status": "Pending",
-        "po_number": "",
-        "date": "10/27/2026",
-      },
-      {
-        "id": 1002,
-        "s_no": 2,
-        "req_id": "MAN-894120-102",
-        "product": "Arduino Uno R3 DIP",
-        "code": "ARD-000-00412",
-        "supplier": "Bajrang Enterprises",
-        "supplier_id": "7000000018",
-        "business_id": "52",
-        "store_id": "38",
-        "req_qty": 10,
-        "supplier_qty": "—",
-        "price": 450.0,
-        "previous_price": 440.0,
-        "current_stock": 2,
-        "min_qty": 5,
-        "type": "MANUAL",
-        "status": "PO",
-        "po_number": "PO-1793012-002",
-        "date": "10/26/2026",
-      },
-      {
-        "id": 1003,
-        "s_no": 3,
-        "req_id": "MAN-894120-103",
-        "product": "Soldering Iron 25W",
-        "code": "SLD-000-00891",
-        "supplier": "Global Traders Pvt Ltd",
-        "supplier_id": "7000000047",
-        "business_id": "52",
-        "store_id": "38",
-        "req_qty": 15,
-        "supplier_qty": "15",
-        "price": 95.0,
-        "previous_price": 95.0,
-        "current_stock": 8,
-        "min_qty": 5,
-        "type": "MANUAL",
-        "status": "Completed",
-        "po_number": "PO-1792980-001",
-        "date": "10/25/2026",
-      },
-      {
-        "id": 1004,
-        "s_no": 4,
-        "req_id": "MAN-894120-104",
-        "product": "Multimeter Digital DT830D",
-        "code": "MLT-000-00714",
-        "supplier": "Circuitpointcare",
-        "supplier_id": "7000000042",
-        "business_id": "52",
-        "store_id": "38",
-        "req_qty": 8,
-        "supplier_qty": "—",
-        "price": 185.0,
-        "previous_price": 180.0,
-        "current_stock": 1,
-        "min_qty": 3,
-        "type": "MANUAL",
-        "status": "Pending",
-        "po_number": "",
-        "date": "10/24/2026",
-      },
-      {
-        "id": 1005,
-        "s_no": 5,
-        "req_id": "MAN-894120-105",
-        "product": "Breadboard 830 Points",
-        "code": "BRD-000-00213",
-        "supplier": "Saravana Electronics",
-        "supplier_id": "7000000015",
-        "business_id": "52",
-        "store_id": "38",
-        "req_qty": 30,
-        "supplier_qty": "—",
-        "price": 65.0,
-        "previous_price": 65.0,
-        "current_stock": 4,
-        "min_qty": 10,
-        "type": "MANUAL",
-        "status": "Pending",
-        "po_number": "",
-        "date": "10/23/2026",
-      },
-      {
-        "id": 1006,
-        "s_no": 6,
-        "req_id": "MAN-894120-106",
-        "product": "Jumper Wires 40pcs Male to Male",
-        "code": "JMP-000-00561",
-        "supplier": "Supplier",
-        "supplier_id": "7000000036",
-        "business_id": "52",
-        "store_id": "38",
-        "req_qty": 50,
-        "supplier_qty": "—",
-        "price": 35.0,
-        "previous_price": 35.0,
-        "current_stock": 7,
-        "min_qty": 15,
-        "type": "MANUAL",
-        "status": "Pending",
-        "po_number": "",
-        "date": "10/22/2026",
-      },
-      {
-        "id": 1007,
-        "s_no": 7,
-        "req_id": "MAN-894120-107",
-        "product": "Lithium Ion Battery 3.7V 2600mAh",
-        "code": "BAT-000-00984",
-        "supplier": "Bajrang Enterprises",
-        "supplier_id": "7000000018",
-        "business_id": "52",
-        "store_id": "38",
-        "req_qty": 20,
-        "supplier_qty": "20",
-        "price": 110.0,
-        "previous_price": 110.0,
-        "current_stock": 10,
-        "min_qty": 5,
-        "type": "MANUAL",
-        "status": "Completed",
-        "po_number": "PO-1792840-003",
-        "date": "10/21/2026",
-      },
-    ];
-
+    manualRestockRequests = [];
     restockRequests = autoRestockRequests;
+
+    // Seed Process Orders list matching Photo 4 & 5
+    processOrdersList = [
+      {
+        "id": 4,
+        "s_no": 1,
+        "date": "10/29/2026",
+        "request_id": "SAR-00495",
+        "notes": "demo 003",
+        "supplier_name": "Roshan Technologies",
+        "supplier_id": "7000000016",
+        "product_id": "3593",
+        "product_name": "Product #3593",
+        "product_code": "PRD-3593",
+        "qty": 4,
+        "supplier_qty": 4,
+        "status": "ACCEPT",
+      },
+      {
+        "id": 3,
+        "s_no": 2,
+        "date": "10/29/2026",
+        "request_id": "AUTO-352363-253",
+        "notes": "TO SENT TOMMORROW",
+        "supplier_name": "Saravana Electronics",
+        "supplier_id": "7000000015",
+        "product_id": "4526",
+        "product_name": "Product #4526",
+        "product_code": "PRD-4526",
+        "qty": 3,
+        "supplier_qty": 3,
+        "status": "ACCEPT",
+      },
+      {
+        "id": 2,
+        "s_no": 3,
+        "date": "10/29/2026",
+        "request_id": "SAR-00458",
+        "notes": "Now I send all the stock",
+        "supplier_name": "Roshan Technologies",
+        "supplier_id": "7000000016",
+        "product_id": "4967",
+        "product_name": "Product #4967",
+        "product_code": "PRD-4967",
+        "qty": 4,
+        "supplier_qty": 4,
+        "status": "PROGRESS",
+      },
+      {
+        "id": 1,
+        "s_no": 4,
+        "date": "10/29/2026",
+        "request_id": "SAR-00457",
+        "notes": "demo 001",
+        "supplier_name": "Saravana Electronics",
+        "supplier_id": "7000000015",
+        "product_id": "4966",
+        "product_name": "Product #4966",
+        "product_code": "PRD-4966",
+        "qty": 4,
+        "supplier_qty": 4,
+        "status": "PROGRESS",
+      },
+    ];
   }
 
   // -----------------------------------------------------------------------
@@ -692,6 +468,94 @@ class _RestockRequestsPageState extends State<RestockRequestsPage> {
     } finally {
       if (mounted) {
         setState(() => isLoading = false);
+      }
+    }
+  }
+
+  // Fetch Process Orders API (Photos 4 & 5)
+  Future<void> _fetchProcessOrders({bool showLoader = false}) async {
+    if (showLoader && mounted) {
+      setState(() => isLoadingProcess = true);
+    }
+    try {
+      final res = await http.get(
+        Uri.parse("https://demotesting.jobes24x7.com/api/demanded-stock-details?limit=1000"),
+      ).timeout(const Duration(seconds: 15));
+
+      if (res.statusCode == 200) {
+        final decoded = jsonDecode(res.body);
+        List<dynamic> items = [];
+        if (decoded is Map && decoded['data'] is List) {
+          items = decoded['data'];
+        } else if (decoded is List) {
+          items = decoded;
+        }
+
+        if (items.isNotEmpty) {
+          final List<Map<String, dynamic>> list = [];
+          int sNo = 1;
+          for (var item in items) {
+            if (item is! Map) continue;
+            final raw = Map<String, dynamic>.from(item);
+
+            final sId = raw['supplier_id']?.toString() ?? '';
+            String sName = "Supplier";
+            if (sId == "7000000016") {
+              sName = "Roshan Technologies";
+            } else if (sId == "7000000015") {
+              sName = "Saravana Electronics";
+            } else if (raw['supplier_name'] != null && raw['supplier_name'].toString().isNotEmpty) {
+              sName = raw['supplier_name'].toString();
+            }
+
+            final pId = raw['product_id']?.toString() ?? '';
+            final reqQty = int.tryParse(raw['request_qty']?.toString() ?? raw['supplier_qty']?.toString() ?? '0') ?? 0;
+            final supQty = int.tryParse(raw['supplier_qty']?.toString() ?? raw['request_qty']?.toString() ?? '0') ?? 0;
+            final rawStatus = (raw['status'] ?? '').toString().toLowerCase();
+            final status = rawStatus.contains('progress') ? 'PROGRESS' : 'ACCEPT';
+            final notes = (raw['Dispatch_Notes'] ?? '').toString();
+
+            String dateStr = "10/29/2026";
+            if (raw['created_at'] != null) {
+              try {
+                final dt = DateTime.parse(raw['created_at'].toString()).toLocal();
+                dateStr = "${dt.month.toString().padLeft(2, '0')}/${dt.day.toString().padLeft(2, '0')}/${dt.year}";
+              } catch (_) {
+                dateStr = raw['created_at'].toString().split('T').first.replaceAll('-', '/');
+              }
+            }
+
+            list.add({
+              "id": raw['id'] ?? sNo,
+              "s_no": sNo++,
+              "request_id": raw['request_code']?.toString() ?? "SAR-$sNo",
+              "date": dateStr,
+              "notes": notes,
+              "supplier_name": sName,
+              "supplier_id": sId,
+              "product_id": pId,
+              "product_name": "Product #$pId",
+              "product_code": "PRD-$pId",
+              "qty": reqQty,
+              "supplier_qty": supQty,
+              "status": status,
+              "raw": raw,
+            });
+          }
+
+          if (mounted) {
+            setState(() {
+              processOrdersList = list;
+              isLoadingProcess = false;
+            });
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint("Process orders fetch error: $e");
+    } finally {
+      if (mounted) {
+        setState(() => isLoadingProcess = false);
       }
     }
   }
@@ -1882,6 +1746,7 @@ class _RestockRequestsPageState extends State<RestockRequestsPage> {
 
   @override
   Widget build(BuildContext context) {
+    // 1. Orders filtering & pagination
     final activeList = isAutoStockMode ? autoRestockRequests : manualRestockRequests;
 
     final filtered = activeList.where((req) {
@@ -1900,7 +1765,7 @@ class _RestockRequestsPageState extends State<RestockRequestsPage> {
         if (selectedStatusFilter == "Rejected" && req['status'] != "Rejected") return false;
       }
 
-      // Supplier filter: if user selected a supplier, only filter if that supplier has items in this store
+      // Supplier filter
       if (selectedSupplierFilter != null && !selectedSupplierFilter!.startsWith("--")) {
         final supId = _extract10DigitSupplierId(selectedSupplierFilter);
         final matchSupId = supId != null && req['supplier_id']?.toString() == supId;
@@ -1913,7 +1778,6 @@ class _RestockRequestsPageState extends State<RestockRequestsPage> {
       return true;
     }).toList();
 
-    // 10-Item Pagination slice
     final int totalItems = filtered.length;
     final int totalPages = (totalItems / pageSize).ceil() < 1 ? 1 : (totalItems / pageSize).ceil();
     if (currentPage > totalPages) {
@@ -1923,11 +1787,50 @@ class _RestockRequestsPageState extends State<RestockRequestsPage> {
     final int startIndex = (currentPage - 1) * pageSize;
     final pagedList = filtered.skip(startIndex).take(pageSize).toList();
 
+    // 2. Process filtering & pagination & grouping (Photos 4 & 5)
+    final filteredProcess = processOrdersList.where((item) {
+      if (processSearchQuery.isNotEmpty) {
+        final q = processSearchQuery.toLowerCase();
+        final r = item['request_id'].toString().toLowerCase();
+        final s = item['supplier_name'].toString().toLowerCase();
+        final p = item['product_name'].toString().toLowerCase();
+        final c = item['product_code'].toString().toLowerCase();
+        final n = item['notes'].toString().toLowerCase();
+        if (!r.contains(q) && !s.contains(q) && !p.contains(q) && !c.contains(q) && !n.contains(q)) return false;
+      }
+      if (processSelectedStatusFilter != "All Statuses") {
+        if (item['status'] != processSelectedStatusFilter) return false;
+      }
+      if (processSupplierFilter != null && processSupplierFilter!.isNotEmpty) {
+        final f = processSupplierFilter!.toLowerCase();
+        final sId = item['supplier_id']?.toString().toLowerCase() ?? '';
+        final sName = item['supplier_name']?.toString().toLowerCase() ?? '';
+        if (sId != f && !sName.contains(f)) return false;
+      }
+      return true;
+    }).toList();
+
+    final int totalProcessItems = filteredProcess.length;
+    final int totalProcessPages = (totalProcessItems / processPageSize).ceil() < 1 ? 1 : (totalProcessItems / processPageSize).ceil();
+    if (processCurrentPage > totalProcessPages) {
+      processCurrentPage = totalProcessPages;
+      processGoToPageCtrl.text = processCurrentPage.toString();
+    }
+    final int processStartIndex = (processCurrentPage - 1) * processPageSize;
+    final pagedProcessList = filteredProcess.skip(processStartIndex).take(processPageSize).toList();
+
+    // Supplier Groups for Grid View (Photo 5)
+    final Map<String, List<Map<String, dynamic>>> supplierGroups = {};
+    for (var item in filteredProcess) {
+      final sId = item['supplier_id']?.toString() ?? 'unknown';
+      supplierGroups.putIfAbsent(sId, () => []).add(item);
+    }
+
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
         title: Text(
-          "Restock Requests",
+          isProcessView ? "Process Orders" : "Restock Requests",
           style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 17, color: const Color(0xFF0F172A)),
         ),
         backgroundColor: Colors.white,
@@ -1941,7 +1844,7 @@ class _RestockRequestsPageState extends State<RestockRequestsPage> {
           IconButton(
             icon: const Icon(Icons.refresh, color: Color(0xFF0F172A)),
             tooltip: "Refresh Data",
-            onPressed: _loadAllRestockData,
+            onPressed: isProcessView ? () => _fetchProcessOrders(showLoader: true) : _loadAllRestockData,
           ),
         ],
         bottom: PreferredSize(
@@ -1949,14 +1852,14 @@ class _RestockRequestsPageState extends State<RestockRequestsPage> {
           child: Container(height: 1, color: Colors.grey.shade200),
         ),
       ),
-      body: isLoading
+      body: ((isLoading && !isProcessView) || (isLoadingProcess && isProcessView && processOrdersList.isEmpty))
           ? const Center(child: CircularProgressIndicator(color: Color(0xFF2563EB)))
           : SingleChildScrollView(
               padding: const EdgeInsets.all(16.0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Top Header: Title, Description, and + Supplier Stock Request Button
+                  // Top Header: Title, Description, and [ 🛒 Orders ] / [ ⚙️ Process ] Switcher
                   Wrap(
                     alignment: WrapAlignment.spaceBetween,
                     crossAxisAlignment: WrapCrossAlignment.center,
@@ -1967,623 +1870,1360 @@ class _RestockRequestsPageState extends State<RestockRequestsPage> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            "Stock Restock Requests",
+                            isProcessView ? "Process Orders" : "Stock Restock Requests",
                             style: GoogleFonts.inter(fontSize: 20, fontWeight: FontWeight.w800, color: const Color(0xFF0F172A)),
                           ),
                           const SizedBox(height: 2),
                           Text(
-                            "Manage and monitor automatic and manual inventory restock requests",
+                            isProcessView
+                                ? "Monitor procurement order processes in table view or grouped by supplier"
+                                : "Manage and monitor automatic and manual inventory restock requests",
                             style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B)),
                           ),
                         ],
                       ),
-                      ElevatedButton.icon(
-                        onPressed: _openSupplierStockRequestModal,
-                        icon: const Icon(Icons.add, size: 15, color: Colors.white),
-                        label: Text(
-                          "+ Supplier Stock Request",
-                          style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
+                      // View Switcher Toggle: [ 🛒 Orders ]  [ ⚙️ Process ]
+                      Container(
+                        padding: const EdgeInsets.all(3),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF1F5F9),
+                          borderRadius: BorderRadius.circular(24),
+                          border: Border.all(color: const Color(0xFFE2E8F0)),
                         ),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF4F46E5),
-                          foregroundColor: Colors.white,
-                          elevation: 0,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            GestureDetector(
+                              onTap: () {
+                                if (isProcessView) {
+                                  setState(() {
+                                    isProcessView = false;
+                                  });
+                                }
+                              },
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+                                decoration: BoxDecoration(
+                                  color: !isProcessView ? const Color(0xFF4F46E5) : Colors.transparent,
+                                  borderRadius: BorderRadius.circular(20),
+                                  boxShadow: !isProcessView
+                                      ? [const BoxShadow(color: Color(0x334F46E5), blurRadius: 4, offset: Offset(0, 2))]
+                                      : null,
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      Icons.shopping_cart_outlined,
+                                      size: 14,
+                                      color: !isProcessView ? Colors.white : const Color(0xFF475569),
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      "Orders",
+                                      style: GoogleFonts.inter(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w700,
+                                        color: !isProcessView ? Colors.white : const Color(0xFF475569),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                            GestureDetector(
+                              onTap: () {
+                                if (!isProcessView) {
+                                  setState(() {
+                                    isProcessView = true;
+                                  });
+                                  _fetchProcessOrders();
+                                }
+                              },
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+                                decoration: BoxDecoration(
+                                  color: isProcessView ? const Color(0xFF4F46E5) : Colors.transparent,
+                                  borderRadius: BorderRadius.circular(20),
+                                  boxShadow: isProcessView
+                                      ? [const BoxShadow(color: Color(0x334F46E5), blurRadius: 4, offset: Offset(0, 2))]
+                                      : null,
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      Icons.settings_outlined,
+                                      size: 14,
+                                      color: isProcessView ? Colors.white : const Color(0xFF475569),
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      "Process",
+                                      style: GoogleFonts.inter(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w700,
+                                        color: isProcessView ? Colors.white : const Color(0xFF475569),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ],
                   ),
                   const SizedBox(height: 16),
 
-                  // Mode Toggle: Manual Stock | Auto Stock
-                  Center(
-                    child: Container(
-                      padding: const EdgeInsets.all(3),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF1F5F9),
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: Colors.grey.shade200),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          GestureDetector(
-                            onTap: () {
-                              if (isAutoStockMode) {
-                                setState(() {
-                                  isAutoStockMode = false;
-                                  currentPage = 1;
-                                  goToPageCtrl.text = "1";
-                                  pendingRequestsCount = manualRestockRequests.where((r) => r['status'] == "Pending").length;
-                                  acceptedOrdersCount = manualRestockRequests.where((r) => r['status'] == "PO").length;
-                                  completedRequestsCount = manualRestockRequests.where((r) => r['status'] == "Completed").length;
-                                  rejectedRequestsCount = manualRestockRequests.where((r) => r['status'] == "Rejected").length;
-                                });
-                                _fetchManualRequests();
-                              }
-                            },
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-                              decoration: BoxDecoration(
-                                color: !isAutoStockMode ? Colors.white : Colors.transparent,
-                                borderRadius: BorderRadius.circular(16),
-                                boxShadow: !isAutoStockMode
-                                    ? const [BoxShadow(color: Color(0x0A000000), blurRadius: 4, offset: Offset(0, 1))]
-                                    : null,
-                              ),
-                              child: Row(
-                                children: [
-                                  Icon(Icons.description_outlined, size: 14, color: !isAutoStockMode ? const Color(0xFF2563EB) : Colors.grey),
-                                  const SizedBox(width: 6),
-                                  Text(
-                                    "Manual Stock",
-                                    style: GoogleFonts.inter(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w600,
-                                      color: !isAutoStockMode ? const Color(0xFF0F172A) : const Color(0xFF64748B),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                          GestureDetector(
-                            onTap: () {
-                              if (!isAutoStockMode) {
-                                setState(() {
-                                  isAutoStockMode = true;
-                                  currentPage = 1;
-                                  goToPageCtrl.text = "1";
-                                  pendingRequestsCount = autoRestockRequests.where((r) => r['status'] == "Pending").length;
-                                  acceptedOrdersCount = autoRestockRequests.where((r) => r['status'] == "PO").length;
-                                  completedRequestsCount = autoRestockRequests.where((r) => r['status'] == "Completed").length;
-                                  rejectedRequestsCount = autoRestockRequests.where((r) => r['status'] == "Rejected").length;
-                                });
-                                final storeId = _extractIdFromOption(selectedStoreFilter) ?? '38';
-                                _fetchAutoRequests(storeId);
-                              }
-                            },
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-                              decoration: BoxDecoration(
-                                color: isAutoStockMode ? Colors.white : Colors.transparent,
-                                borderRadius: BorderRadius.circular(16),
-                                boxShadow: isAutoStockMode
-                                    ? const [BoxShadow(color: Color(0x0A000000), blurRadius: 4, offset: Offset(0, 1))]
-                                    : null,
-                              ),
-                              child: Row(
-                                children: [
-                                  Icon(Icons.bolt_outlined, size: 14, color: isAutoStockMode ? const Color(0xFF2563EB) : Colors.grey),
-                                  const SizedBox(width: 6),
-                                  Text(
-                                    "Auto Stock",
-                                    style: GoogleFonts.inter(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w600,
-                                      color: isAutoStockMode ? const Color(0xFF0F172A) : const Color(0xFF64748B),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-
-                  // 4 Stat Cards Row
-                  LayoutBuilder(
-                    builder: (context, constraints) {
-                      final isNarrow = constraints.maxWidth < 650;
-                      final cardWidth = isNarrow ? (constraints.maxWidth - 12) / 2 : (constraints.maxWidth - 36) / 4;
-
-                      return Wrap(
-                        spacing: 12,
-                        runSpacing: 12,
-                        children: [
-                          _buildMetricCard(
-                            title: "PENDING REQUESTS",
-                            count: pendingRequestsCount.toString(),
-                            subtitle: "Awaiting supplier response",
-                            icon: Icons.access_time_rounded,
-                            iconBg: const Color(0xFFFEF3C7),
-                            iconColor: const Color(0xFFD97706),
-                            width: cardWidth,
-                          ),
-                          _buildMetricCard(
-                            title: "ACCEPTED / ORDERS",
-                            count: acceptedOrdersCount.toString(),
-                            subtitle: "Purchase orders placed",
-                            icon: Icons.shopping_cart_outlined,
-                            iconBg: const Color(0xFFEFF6FF),
-                            iconColor: const Color(0xFF2563EB),
-                            width: cardWidth,
-                          ),
-                          _buildMetricCard(
-                            title: "COMPLETED REQUESTS",
-                            count: completedRequestsCount.toString(),
-                            subtitle: "Goods received & stock added",
-                            icon: Icons.verified_user_outlined,
-                            iconBg: const Color(0xFFDCFCE7),
-                            iconColor: const Color(0xFF16A34A),
-                            width: cardWidth,
-                          ),
-                          _buildMetricCard(
-                            title: "REJECTED REQUESTS",
-                            count: rejectedRequestsCount.toString(),
-                            subtitle: "Declined by supplier",
-                            icon: Icons.highlight_off_rounded,
-                            iconBg: const Color(0xFFFEE2E2),
-                            iconColor: const Color(0xFFDC2626),
-                            width: cardWidth,
-                          ),
-                        ],
-                      );
-                    },
-                  ),
-                  const SizedBox(height: 20),
-
-                  // Supplier Based Store Filtering Card (Web Screenshot 2)
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    margin: const EdgeInsets.only(bottom: 16),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: const Color(0xFFE2E8F0)),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Row(
-                              children: [
-                                const Icon(Icons.filter_alt_outlined, size: 16, color: Color(0xFF6366F1)),
-                                const SizedBox(width: 8),
-                                Text(
-                                  "Supplier Based Store Filtering",
-                                  style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A)),
-                                ),
-                              ],
-                            ),
-                            if (selectedSupplierFilter != null && !selectedSupplierFilter!.startsWith("--"))
-                              InkWell(
-                                onTap: _clearSupplierFilters,
-                                borderRadius: BorderRadius.circular(6),
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFFF1F5F9),
-                                    borderRadius: BorderRadius.circular(6),
-                                    border: Border.all(color: const Color(0xFFE2E8F0)),
-                                  ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      const Icon(Icons.close, size: 12, color: Color(0xFF64748B)),
-                                      const SizedBox(width: 4),
-                                      Text(
-                                        "Clear Filter",
-                                        style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.bold, color: const Color(0xFF64748B)),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                          ],
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          "Filter auto-restock requests by selecting a 10-digit Supplier ID, Business, and Store",
-                          style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B)),
-                        ),
-                        const SizedBox(height: 12),
-                        LayoutBuilder(
-                          builder: (context, constraints) {
-                            final isNarrow = constraints.maxWidth < 650;
-                            if (isNarrow) {
-                              return Column(
-                                children: [
-                                  _buildFilterBox("1. Supplier ID (10 Digits)", selectedSupplierFilter ?? "-- Select Supplier (10 Digits) --", supplierOptions, (val) {
-                                    _onSupplierSelected(val);
-                                  }),
-                                  const SizedBox(height: 10),
-                                  _buildFilterBox("2. Business", selectedBusinessFilter ?? (businessOptions.isNotEmpty ? businessOptions.first : "-- Select Business --"), businessOptions, (val) {
-                                    _onBusinessSelected(val);
-                                  }),
-                                  const SizedBox(height: 10),
-                                  _buildFilterBox("3. Store", selectedStoreFilter ?? (storeOptions.isNotEmpty ? storeOptions.first : "-- Select Store --"), storeOptions, (val) {
-                                    _onStoreSelected(val);
-                                  }),
-                                ],
-                              );
-                            }
-                            return Row(
-                              children: [
-                                Expanded(
-                                  child: _buildFilterBox("1. Supplier ID (10 Digits)", selectedSupplierFilter ?? "-- Select Supplier (10 Digits) --", supplierOptions, (val) {
-                                    _onSupplierSelected(val);
-                                  }),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: _buildFilterBox("2. Business", selectedBusinessFilter ?? (businessOptions.isNotEmpty ? businessOptions.first : "-- Select Business --"), businessOptions, (val) {
-                                    _onBusinessSelected(val);
-                                  }),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: _buildFilterBox("3. Store", selectedStoreFilter ?? (storeOptions.isNotEmpty ? storeOptions.first : "-- Select Store --"), storeOptions, (val) {
-                                    _onStoreSelected(val);
-                                  }),
-                                ),
-                              ],
-                            );
-                          },
-                        ),
-                        // Active Filter Pill Bar (Web Screenshot 2)
-                        if (selectedSupplierFilter != null && !selectedSupplierFilter!.startsWith("--"))
-                          Container(
-                            margin: const EdgeInsets.only(top: 12),
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFF1F5F9),
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(color: const Color(0xFFE2E8F0)),
-                            ),
-                            child: Wrap(
-                              crossAxisAlignment: WrapCrossAlignment.center,
-                              spacing: 6,
-                              runSpacing: 4,
-                              children: [
-                                Text(
-                                  "Active Filter: ",
-                                  style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.bold, color: const Color(0xFF475569)),
-                                ),
-                                _buildFilterPill("Supplier", _extract10DigitSupplierId(selectedSupplierFilter) ?? selectedSupplierFilter!),
-                                if (selectedBusinessFilter != null && !selectedBusinessFilter!.startsWith("--")) ...[
-                                  const Icon(Icons.chevron_right, size: 14, color: Color(0xFF94A3B8)),
-                                  _buildFilterPill("Business", selectedBusinessFilter!.split('(').first.trim()),
-                                ],
-                                if (selectedStoreFilter != null && !selectedStoreFilter!.startsWith("--")) ...[
-                                  const Icon(Icons.chevron_right, size: 14, color: Color(0xFF94A3B8)),
-                                  _buildFilterPill("Store", selectedStoreFilter!.split('(').first.trim()),
-                                ],
-                              ],
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-
-                  // Search & Status Filter Bar
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: const Color(0xFFE2E8F0)),
-                    ),
-                    child: LayoutBuilder(
-                      builder: (context, constraints) {
-                        final isNarrow = constraints.maxWidth < 650;
-
-                        final searchField = SizedBox(
-                          height: 40,
-                          child: TextField(
-                            onChanged: (val) {
-                              setState(() {
-                                searchQuery = val;
-                                currentPage = 1;
-                                goToPageCtrl.text = "1";
-                              });
-                            },
-                            style: GoogleFonts.inter(fontSize: 12),
-                            decoration: InputDecoration(
-                              hintText: "Search by request code, order ID, product, supplier...",
-                              hintStyle: GoogleFonts.inter(color: Colors.grey.shade400, fontSize: 12),
-                              prefixIcon: const Icon(Icons.search, size: 16, color: Colors.grey),
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 10),
-                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFFCBD5E1))),
-                              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFFCBD5E1))),
-                              focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFF2563EB))),
-                            ),
-                          ),
-                        );
-
-                        final statusField = SizedBox(
-                          height: 40,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10),
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(color: const Color(0xFFCBD5E1)),
-                            ),
-                            child: DropdownButtonHideUnderline(
-                              child: DropdownButton<String>(
-                                value: selectedStatusFilter,
-                                isExpanded: true,
-                                items: statusFilterOptions.map((st) => DropdownMenuItem(value: st, child: Text(st, style: GoogleFonts.inter(fontSize: 12)))).toList(),
-                                onChanged: (val) {
-                                  setState(() {
-                                    selectedStatusFilter = val ?? "All Statuses";
-                                    currentPage = 1;
-                                    goToPageCtrl.text = "1";
-                                  });
-                                },
-                              ),
-                            ),
-                          ),
-                        );
-
-                        if (isNarrow) {
-                          return Column(
-                            children: [
-                              searchField,
-                              const SizedBox(height: 10),
-                              Row(
-                                children: [
-                                  Expanded(child: statusField),
-                                  const SizedBox(width: 8),
-                                  IconButton(
-                                    icon: const Icon(Icons.refresh, color: Colors.grey),
-                                    onPressed: _loadAllRestockData,
-                                  ),
-                                ],
-                              ),
-                            ],
-                          );
-                        }
-
-                        return Row(
-                          children: [
-                            Expanded(flex: 7, child: searchField),
-                            const SizedBox(width: 12),
-                            Expanded(flex: 3, child: statusField),
-                            const SizedBox(width: 8),
-                            IconButton(
-                              icon: const Icon(Icons.refresh, color: Colors.grey),
-                              onPressed: _loadAllRestockData,
-                            ),
-                          ],
-                        );
-                      },
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-
-                  // Requests Table with 10-Item Pagination
-                  Container(
-                    width: double.infinity,
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: const Color(0xFFE2E8F0)),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        SingleChildScrollView(
-                          scrollDirection: Axis.horizontal,
-                          child: DataTable(
-                            headingRowColor: WidgetStateProperty.all(const Color(0xFFF8FAFC)),
-                            dataRowMinHeight: 56,
-                            dataRowMaxHeight: 64,
-                            columnSpacing: 24,
-                            horizontalMargin: 16,
-                            columns: [
-                              _buildTableCol("S.NO", minWidth: 48),
-                              _buildTableCol("REQUEST ID", minWidth: 130),
-                              _buildTableCol("PRODUCT", minWidth: 200),
-                              _buildTableCol("CODE", minWidth: 110),
-                              _buildTableCol("SUPPLIER", minWidth: 150),
-                              _buildTableCol("REQ QTY", minWidth: 75, align: TextAlign.center),
-                              _buildTableCol("SUPPLIER QTY", minWidth: 95, align: TextAlign.center),
-                              _buildTableCol("REQUEST TYPE", minWidth: 105),
-                              _buildTableCol("STATUS", minWidth: 105),
-                              _buildTableCol("REQUEST DATE", minWidth: 110),
-                              _buildTableCol("ACTION", minWidth: 160),
-                            ],
-                            rows: pagedList.map((req) {
-                              return DataRow(
-                                cells: [
-                                  // S.NO
-                                  DataCell(
-                                    Container(
-                                      constraints: const BoxConstraints(minWidth: 48),
-                                      child: Text(
-                                        req['s_no'].toString(),
-                                        style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF334155)),
-                                      ),
-                                    ),
-                                  ),
-                                  // Request ID
-                                  DataCell(
-                                    Container(
-                                      constraints: const BoxConstraints(minWidth: 130),
-                                      child: Text(
-                                        req['req_id'].toString(),
-                                        style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold, color: const Color(0xFF2563EB)),
-                                      ),
-                                    ),
-                                  ),
-                                  // Product (Clickable to open View Details Modal)
-                                  DataCell(
-                                    ConstrainedBox(
-                                      constraints: const BoxConstraints(minWidth: 200, maxWidth: 260),
-                                      child: InkWell(
-                                        onTap: () => _openViewDetailsModal(req),
-                                        child: Text(
-                                          req['product'].toString(),
-                                          style: GoogleFonts.inter(
-                                            fontSize: 12,
-                                            fontWeight: FontWeight.w600,
-                                            color: const Color(0xFF0F172A),
-                                          ),
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                  // Code Badge
-                                  DataCell(
-                                    Container(
-                                      constraints: const BoxConstraints(minWidth: 110),
-                                      child: Align(
-                                        alignment: Alignment.centerLeft,
-                                        child: Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-                                          decoration: BoxDecoration(
-                                            color: const Color(0xFFF1F5F9),
-                                            borderRadius: BorderRadius.circular(4),
-                                            border: Border.all(color: const Color(0xFFE2E8F0)),
-                                          ),
-                                          child: Text(
-                                            req['code'].toString(),
-                                            style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.bold, color: const Color(0xFF475569)),
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                  // Supplier
-                                  DataCell(
-                                    ConstrainedBox(
-                                      constraints: const BoxConstraints(minWidth: 150, maxWidth: 180),
-                                      child: Text(
-                                        req['supplier'].toString(),
-                                        style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF334155)),
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ),
-                                  ),
-                                  // Req Qty
-                                  DataCell(
-                                    Container(
-                                      constraints: const BoxConstraints(minWidth: 75),
-                                      child: Center(
-                                        child: Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                          decoration: BoxDecoration(color: const Color(0xFFEFF6FF), borderRadius: BorderRadius.circular(4)),
-                                          child: Text(req['req_qty'].toString(), style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.bold, color: const Color(0xFF2563EB))),
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                  // Supplier Qty
-                                  DataCell(
-                                    Container(
-                                      constraints: const BoxConstraints(minWidth: 95),
-                                      child: Center(
-                                        child: Text(
-                                          req['supplier_qty'].toString(),
-                                          style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B)),
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                  // Request Type
-                                  DataCell(
-                                    Container(
-                                      constraints: const BoxConstraints(minWidth: 105),
-                                      child: FittedBox(
-                                        fit: BoxFit.scaleDown,
-                                        alignment: Alignment.centerLeft,
-                                        child: Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                          decoration: BoxDecoration(
-                                            color: const Color(0xFFF0FDF4),
-                                            borderRadius: BorderRadius.circular(12),
-                                            border: Border.all(color: const Color(0xFFBBF7D0)),
-                                          ),
-                                          child: Row(
-                                            mainAxisSize: MainAxisSize.min,
-                                            children: [
-                                              const Icon(Icons.bolt, size: 12, color: Color(0xFF16A34A)),
-                                              const SizedBox(width: 2),
-                                              Text(
-                                                req['type'].toString(),
-                                                style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.bold, color: const Color(0xFF16A34A)),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                  // Status Badge
-                                  DataCell(
-                                    Container(
-                                      constraints: const BoxConstraints(minWidth: 105),
-                                      child: FittedBox(
-                                        fit: BoxFit.scaleDown,
-                                        alignment: Alignment.centerLeft,
-                                        child: _buildStatusBadge(req),
-                                      ),
-                                    ),
-                                  ),
-                                  // Request Date
-                                  DataCell(
-                                    Container(
-                                      constraints: const BoxConstraints(minWidth: 110),
-                                      child: Text(
-                                        req['date'].toString(),
-                                        style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B)),
-                                      ),
-                                    ),
-                                  ),
-                                  // Action Buttons
-                                  DataCell(
-                                    Container(
-                                      constraints: const BoxConstraints(minWidth: 160),
-                                      child: FittedBox(
-                                        fit: BoxFit.scaleDown,
-                                        alignment: Alignment.centerLeft,
-                                        child: _buildActionButtons(req),
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              );
-                            }).toList(),
-                          ),
-                        ),
-                        // Bottom Pagination Controls (Web Screenshot 1)
-                        _buildPaginationBar(totalPages, totalItems),
-                      ],
-                    ),
-                  ),
+                  // Conditional Views: Orders vs Process
+                  if (!isProcessView) ...[
+                    _buildOrdersBody(pagedList, totalPages, totalItems),
+                  ] else ...[
+                    _buildProcessBody(pagedProcessList, supplierGroups, totalProcessPages, totalProcessItems),
+                  ],
                 ],
               ),
             ),
     );
   }
+
+  // -----------------------------------------------------------------------
+  // ORDERS VIEW (Photos 1 & 3)
+  // -----------------------------------------------------------------------
+  Widget _buildOrdersBody(List<Map<String, dynamic>> pagedList, int totalPages, int totalItems) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Mode Toggle: Manual Stock | Auto Stock
+        Center(
+          child: Container(
+            padding: const EdgeInsets.all(3),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF1F5F9),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: Colors.grey.shade200),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                GestureDetector(
+                  onTap: () {
+                    if (isAutoStockMode) {
+                      setState(() {
+                        isAutoStockMode = false;
+                        currentPage = 1;
+                        goToPageCtrl.text = "1";
+                        pendingRequestsCount = manualRestockRequests.where((r) => r['status'] == "Pending").length;
+                        acceptedOrdersCount = manualRestockRequests.where((r) => r['status'] == "PO").length;
+                        completedRequestsCount = manualRestockRequests.where((r) => r['status'] == "Completed").length;
+                        rejectedRequestsCount = manualRestockRequests.where((r) => r['status'] == "Rejected").length;
+                      });
+                      _fetchManualRequests();
+                    }
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: !isAutoStockMode ? Colors.white : Colors.transparent,
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: !isAutoStockMode
+                          ? const [BoxShadow(color: Color(0x0A000000), blurRadius: 4, offset: Offset(0, 1))]
+                          : null,
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.description_outlined, size: 14, color: !isAutoStockMode ? const Color(0xFF2563EB) : Colors.grey),
+                        const SizedBox(width: 6),
+                        Text(
+                          "Manual Stock",
+                          style: GoogleFonts.inter(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: !isAutoStockMode ? const Color(0xFF0F172A) : const Color(0xFF64748B),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                GestureDetector(
+                  onTap: () {
+                    if (!isAutoStockMode) {
+                      setState(() {
+                        isAutoStockMode = true;
+                        currentPage = 1;
+                        goToPageCtrl.text = "1";
+                        pendingRequestsCount = autoRestockRequests.where((r) => r['status'] == "Pending").length;
+                        acceptedOrdersCount = autoRestockRequests.where((r) => r['status'] == "PO").length;
+                        completedRequestsCount = autoRestockRequests.where((r) => r['status'] == "Completed").length;
+                        rejectedRequestsCount = autoRestockRequests.where((r) => r['status'] == "Rejected").length;
+                      });
+                      final storeId = _extractIdFromOption(selectedStoreFilter) ?? '61';
+                      _fetchAutoRequests(storeId);
+                    }
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: isAutoStockMode ? Colors.white : Colors.transparent,
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: isAutoStockMode
+                          ? const [BoxShadow(color: Color(0x0A000000), blurRadius: 4, offset: Offset(0, 1))]
+                          : null,
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.bolt_outlined, size: 14, color: isAutoStockMode ? const Color(0xFF2563EB) : Colors.grey),
+                        const SizedBox(width: 6),
+                        Text(
+                          "Auto Stock",
+                          style: GoogleFonts.inter(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: isAutoStockMode ? const Color(0xFF0F172A) : const Color(0xFF64748B),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 20),
+
+        // 4 Stat Cards Row (Web Photo 1 & 3: Pending 2, Accepted 0, Completed 0, Rejected 0)
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final isNarrow = constraints.maxWidth < 650;
+            if (isNarrow) {
+              return Column(
+                children: [
+                  Row(
+                    children: [
+                      Expanded(child: _buildMetricCard("PENDING REQUESTS", pendingRequestsCount.toString(), "Awaiting supplier response", const Color(0xFFCA8A04), const Color(0xFFFEF9C3), Icons.access_time)),
+                      const SizedBox(width: 10),
+                      Expanded(child: _buildMetricCard("ACCEPTED / ORDERS", acceptedOrdersCount.toString(), "Purchase orders placed", const Color(0xFF2563EB), const Color(0xFFEFF6FF), Icons.shopping_cart_outlined)),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      Expanded(child: _buildMetricCard("COMPLETED REQUESTS", completedRequestsCount.toString(), "Goods received & stock added", const Color(0xFF16A34A), const Color(0xFFF0FDF4), Icons.check_circle_outline)),
+                      const SizedBox(width: 10),
+                      Expanded(child: _buildMetricCard("REJECTED REQUESTS", rejectedRequestsCount.toString(), "Declined by supplier", const Color(0xFFDC2626), const Color(0xFFFEF2F2), Icons.cancel_outlined)),
+                    ],
+                  ),
+                ],
+              );
+            }
+            return Row(
+              children: [
+                Expanded(child: _buildMetricCard("PENDING REQUESTS", pendingRequestsCount.toString(), "Awaiting supplier response", const Color(0xFFCA8A04), const Color(0xFFFEF9C3), Icons.access_time)),
+                const SizedBox(width: 12),
+                Expanded(child: _buildMetricCard("ACCEPTED / ORDERS", acceptedOrdersCount.toString(), "Purchase orders placed", const Color(0xFF2563EB), const Color(0xFFEFF6FF), Icons.shopping_cart_outlined)),
+                const SizedBox(width: 12),
+                Expanded(child: _buildMetricCard("COMPLETED REQUESTS", completedRequestsCount.toString(), "Goods received & stock added", const Color(0xFF16A34A), const Color(0xFFF0FDF4), Icons.check_circle_outline)),
+                const SizedBox(width: 12),
+                Expanded(child: _buildMetricCard("REJECTED REQUESTS", rejectedRequestsCount.toString(), "Declined by supplier", const Color(0xFFDC2626), const Color(0xFFFEF2F2), Icons.cancel_outlined)),
+              ],
+            );
+          },
+        ),
+        const SizedBox(height: 20),
+
+        // Supplier-Based Store Filtering Section
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: const Color(0xFFE2E8F0)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.filter_alt_outlined, size: 16, color: Color(0xFF4F46E5)),
+                  const SizedBox(width: 8),
+                  Text(
+                    "Supplier-Based Store Filtering",
+                    style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A)),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 2),
+              Text(
+                "Filter orders by selecting a 10-digit Supplier ID",
+                style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B)),
+              ),
+              const SizedBox(height: 12),
+              _buildFilterBox("Supplier ID (10 Digits)", selectedSupplierFilter ?? "-- Select Supplier (10 Digits) --", supplierOptions, (val) {
+                _onSupplierSelected(val);
+              }),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+
+        // Search & Status Filter Bar
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: const Color(0xFFE2E8F0)),
+          ),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final isNarrow = constraints.maxWidth < 650;
+
+              final searchField = SizedBox(
+                height: 40,
+                child: TextField(
+                  onChanged: (val) {
+                    setState(() {
+                      searchQuery = val;
+                      currentPage = 1;
+                      goToPageCtrl.text = "1";
+                    });
+                  },
+                  style: GoogleFonts.inter(fontSize: 12),
+                  decoration: InputDecoration(
+                    hintText: "Search by request code, order ID, product, supplier...",
+                    hintStyle: GoogleFonts.inter(color: Colors.grey.shade400, fontSize: 12),
+                    prefixIcon: const Icon(Icons.search, size: 16, color: Colors.grey),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 10),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFFCBD5E1))),
+                    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFFCBD5E1))),
+                    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFF2563EB))),
+                  ),
+                ),
+              );
+
+              final statusField = SizedBox(
+                height: 40,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: const Color(0xFFCBD5E1)),
+                  ),
+                  child: DropdownButtonHideUnderline(
+                    child: DropdownButton<String>(
+                      value: selectedStatusFilter,
+                      isExpanded: true,
+                      items: statusFilterOptions.map((st) => DropdownMenuItem(value: st, child: Text(st, style: GoogleFonts.inter(fontSize: 12)))).toList(),
+                      onChanged: (val) {
+                        setState(() {
+                          selectedStatusFilter = val ?? "All Statuses";
+                          currentPage = 1;
+                          goToPageCtrl.text = "1";
+                        });
+                      },
+                    ),
+                  ),
+                ),
+              );
+
+              if (isNarrow) {
+                return Column(
+                  children: [
+                    searchField,
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        Expanded(child: statusField),
+                        const SizedBox(width: 8),
+                        IconButton(
+                          icon: const Icon(Icons.refresh, color: Colors.grey),
+                          onPressed: _loadAllRestockData,
+                        ),
+                      ],
+                    ),
+                  ],
+                );
+              }
+
+              return Row(
+                children: [
+                  Expanded(flex: 7, child: searchField),
+                  const SizedBox(width: 12),
+                  Expanded(flex: 3, child: statusField),
+                  const SizedBox(width: 8),
+                  IconButton(
+                    icon: const Icon(Icons.refresh, color: Colors.grey),
+                    onPressed: _loadAllRestockData,
+                  ),
+                ],
+              );
+            },
+          ),
+        ),
+        const SizedBox(height: 16),
+
+        // Orders Table: STRICTLY 7 Columns matching Web Photo 3
+        // S.NO | DATE | REQUEST ID | SUPPLIER NAME | PRODUCT | QTY | STATUS
+        Container(
+          width: double.infinity,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: const Color(0xFFE2E8F0)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: DataTable(
+                  headingRowColor: WidgetStateProperty.all(const Color(0xFFF8FAFC)),
+                  dataRowMinHeight: 56,
+                  dataRowMaxHeight: 64,
+                  columnSpacing: 24,
+                  horizontalMargin: 16,
+                  columns: [
+                    _buildTableCol("S.NO", minWidth: 48),
+                    _buildTableCol("DATE", minWidth: 95),
+                    _buildTableCol("REQUEST ID", minWidth: 140),
+                    _buildTableCol("SUPPLIER NAME", minWidth: 160),
+                    _buildTableCol("PRODUCT", minWidth: 200),
+                    _buildTableCol("QTY", minWidth: 60, align: TextAlign.center),
+                    _buildTableCol("STATUS", minWidth: 100),
+                  ],
+                  rows: pagedList.map((req) {
+                    return DataRow(
+                      cells: [
+                        // 1. S.NO
+                        DataCell(
+                          Container(
+                            constraints: const BoxConstraints(minWidth: 48),
+                            child: Text(
+                              req['s_no'].toString(),
+                              style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF334155)),
+                            ),
+                          ),
+                        ),
+                        // 2. DATE
+                        DataCell(
+                          Container(
+                            constraints: const BoxConstraints(minWidth: 95),
+                            child: Text(
+                              req['date']?.toString() ?? "10/27/2026",
+                              style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF475569)),
+                            ),
+                          ),
+                        ),
+                        // 3. REQUEST ID
+                        DataCell(
+                          Container(
+                            constraints: const BoxConstraints(minWidth: 140),
+                            child: Text(
+                              req['req_id'].toString(),
+                              style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold, color: const Color(0xFF2563EB)),
+                            ),
+                          ),
+                        ),
+                        // 4. SUPPLIER NAME
+                        DataCell(
+                          ConstrainedBox(
+                            constraints: const BoxConstraints(minWidth: 160, maxWidth: 200),
+                            child: Text(
+                              req['supplier'].toString(),
+                              style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF334155)),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ),
+                        // 5. PRODUCT (Product Name + Code Badge underneath)
+                        DataCell(
+                          ConstrainedBox(
+                            constraints: const BoxConstraints(minWidth: 200, maxWidth: 260),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                InkWell(
+                                  onTap: () => _openViewDetailsModal(req),
+                                  child: Text(
+                                    req['product'].toString(),
+                                    style: GoogleFonts.inter(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w700,
+                                      color: const Color(0xFF0F172A),
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                                if (req['code'] != null && req['code'].toString().isNotEmpty) ...[
+                                  const SizedBox(height: 2),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFF1F5F9),
+                                      borderRadius: BorderRadius.circular(4),
+                                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                                    ),
+                                    child: Text(
+                                      req['code'].toString(),
+                                      style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.bold, color: const Color(0xFF64748B)),
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                        ),
+                        // 6. QTY (Pill)
+                        DataCell(
+                          Container(
+                            constraints: const BoxConstraints(minWidth: 60),
+                            child: Center(
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFEFF6FF),
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: Text(
+                                  req['req_qty'].toString(),
+                                  style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.bold, color: const Color(0xFF2563EB)),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                        // 7. STATUS (Yellow Clock Pending Badge)
+                        DataCell(
+                          Container(
+                            constraints: const BoxConstraints(minWidth: 100),
+                            child: Align(
+                              alignment: Alignment.centerLeft,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFFEF9C3),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(color: const Color(0xFFFEF08A)),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Icon(Icons.access_time, size: 12, color: Color(0xFFCA8A04)),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      req['status']?.toString() ?? "Pending",
+                                      style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600, color: const Color(0xFFCA8A04)),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    );
+                  }).toList(),
+                ),
+              ),
+              // Bottom Pagination Controls
+              _buildPaginationBar(totalPages, totalItems),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  // -----------------------------------------------------------------------
+  // PROCESS VIEW (Photos 4 & 5)
+  // -----------------------------------------------------------------------
+  Widget _buildProcessBody(
+    List<Map<String, dynamic>> pagedProcessList,
+    Map<String, List<Map<String, dynamic>>> supplierGroups,
+    int totalProcessPages,
+    int totalProcessItems,
+  ) {
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Process Orders Card Header with [ 🗂️ Table View ] / [ 🔲 Grid View ]
+          Wrap(
+            alignment: WrapAlignment.spaceBetween,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: 12,
+            runSpacing: 10,
+            children: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    "Process Orders",
+                    style: GoogleFonts.inter(fontSize: 17, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A)),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    "Monitor procurement order processes in table view or grouped by supplier",
+                    style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B)),
+                  ),
+                ],
+              ),
+              // Sub-toggle: Table View vs Grid View
+              Container(
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF1F5F9),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                ),
+                padding: const EdgeInsets.all(2),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    GestureDetector(
+                      onTap: () {
+                        if (isProcessGridView) {
+                          setState(() {
+                            isProcessGridView = false;
+                          });
+                        }
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: !isProcessGridView ? Colors.white : Colors.transparent,
+                          borderRadius: BorderRadius.circular(6),
+                          boxShadow: !isProcessGridView
+                              ? [const BoxShadow(color: Color(0x0A000000), blurRadius: 4, offset: Offset(0, 1))]
+                              : null,
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.table_chart_outlined, size: 14, color: !isProcessGridView ? const Color(0xFF4F46E5) : const Color(0xFF64748B)),
+                            const SizedBox(width: 4),
+                            Text(
+                              "Table View",
+                              style: GoogleFonts.inter(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: !isProcessGridView ? const Color(0xFF4F46E5) : const Color(0xFF64748B),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    GestureDetector(
+                      onTap: () {
+                        if (!isProcessGridView) {
+                          setState(() {
+                            isProcessGridView = true;
+                          });
+                        }
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: isProcessGridView ? Colors.white : Colors.transparent,
+                          borderRadius: BorderRadius.circular(6),
+                          boxShadow: isProcessGridView
+                              ? [const BoxShadow(color: Color(0x0A000000), blurRadius: 4, offset: Offset(0, 1))]
+                              : null,
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.grid_view_outlined, size: 14, color: isProcessGridView ? const Color(0xFF4F46E5) : const Color(0xFF64748B)),
+                            const SizedBox(width: 4),
+                            Text(
+                              "Grid View",
+                              style: GoogleFonts.inter(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: isProcessGridView ? const Color(0xFF4F46E5) : const Color(0xFF64748B),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+
+          // Filters Row: Search Input | All Time | All Statuses | Refresh
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final isNarrow = constraints.maxWidth < 650;
+
+              final searchField = SizedBox(
+                height: 40,
+                child: TextField(
+                  onChanged: (val) {
+                    setState(() {
+                      processSearchQuery = val;
+                      processCurrentPage = 1;
+                      processGoToPageCtrl.text = "1";
+                    });
+                  },
+                  style: GoogleFonts.inter(fontSize: 12),
+                  decoration: InputDecoration(
+                    hintText: "Search or enter Request ID (e.g. AUTO-352363-253)...",
+                    hintStyle: GoogleFonts.inter(color: Colors.grey.shade400, fontSize: 12),
+                    prefixIcon: const Icon(Icons.search, size: 16, color: Colors.grey),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 10),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFFCBD5E1))),
+                    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFFCBD5E1))),
+                    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFF2563EB))),
+                  ),
+                ),
+              );
+
+              final timeField = SizedBox(
+                height: 40,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: const Color(0xFFCBD5E1)),
+                  ),
+                  child: DropdownButtonHideUnderline(
+                    child: DropdownButton<String>(
+                      value: processSelectedTimeFilter,
+                      items: processTimeFilterOptions.map((t) => DropdownMenuItem(value: t, child: Text(t, style: GoogleFonts.inter(fontSize: 12)))).toList(),
+                      onChanged: (val) {
+                        setState(() {
+                          processSelectedTimeFilter = val ?? "All Time";
+                        });
+                      },
+                    ),
+                  ),
+                ),
+              );
+
+              final statusField = SizedBox(
+                height: 40,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: const Color(0xFFCBD5E1)),
+                  ),
+                  child: DropdownButtonHideUnderline(
+                    child: DropdownButton<String>(
+                      value: processSelectedStatusFilter,
+                      items: processStatusFilterOptions.map((st) => DropdownMenuItem(value: st, child: Text(st, style: GoogleFonts.inter(fontSize: 12)))).toList(),
+                      onChanged: (val) {
+                        setState(() {
+                          processSelectedStatusFilter = val ?? "All Statuses";
+                          processCurrentPage = 1;
+                          processGoToPageCtrl.text = "1";
+                        });
+                      },
+                    ),
+                  ),
+                ),
+              );
+
+              if (isNarrow) {
+                return Column(
+                  children: [
+                    searchField,
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        Expanded(child: timeField),
+                        const SizedBox(width: 8),
+                        Expanded(child: statusField),
+                        const SizedBox(width: 8),
+                        IconButton(
+                          icon: const Icon(Icons.refresh, color: Colors.grey),
+                          onPressed: () => _fetchProcessOrders(showLoader: true),
+                        ),
+                      ],
+                    ),
+                  ],
+                );
+              }
+
+              return Row(
+                children: [
+                  Expanded(flex: 5, child: searchField),
+                  const SizedBox(width: 10),
+                  SizedBox(width: 120, child: timeField),
+                  const SizedBox(width: 10),
+                  SizedBox(width: 130, child: statusField),
+                  const SizedBox(width: 6),
+                  IconButton(
+                    icon: const Icon(Icons.refresh, color: Colors.grey),
+                    onPressed: () => _fetchProcessOrders(showLoader: true),
+                  ),
+                ],
+              );
+            },
+          ),
+          const SizedBox(height: 12),
+
+          // Active Supplier Filter Banner (when View Products is clicked from Grid View)
+          if (processSupplierFilter != null && processSupplierFilter!.isNotEmpty)
+            Container(
+              margin: const EdgeInsets.only(bottom: 14),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: const Color(0xFFEFF6FF),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: const Color(0xFFBFDBFE)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.filter_alt, size: 14, color: Color(0xFF2563EB)),
+                  const SizedBox(width: 6),
+                  Text(
+                    "Filtered by Supplier ID: $processSupplierFilter",
+                    style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: const Color(0xFF1E40AF)),
+                  ),
+                  const Spacer(),
+                  InkWell(
+                    onTap: () {
+                      setState(() {
+                        processSupplierFilter = null;
+                      });
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(4),
+                        border: Border.all(color: const Color(0xFF93C5FD)),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.close, size: 12, color: Color(0xFF1E40AF)),
+                          const SizedBox(width: 4),
+                          Text(
+                            "Clear",
+                            style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.bold, color: const Color(0xFF1E40AF)),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+          // Content: Table View vs Grid View
+          if (!isProcessGridView) ...[
+            // PROCESS TABLE VIEW (Photo 4)
+            // S.NO | DATE | REQUEST ID | SUPPLIER NAME | PRODUCT | QTY | STATUS
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: DataTable(
+                headingRowColor: WidgetStateProperty.all(const Color(0xFFF8FAFC)),
+                dataRowMinHeight: 56,
+                dataRowMaxHeight: 68,
+                columnSpacing: 24,
+                horizontalMargin: 8,
+                columns: [
+                  _buildTableCol("S.NO", minWidth: 48),
+                  _buildTableCol("DATE", minWidth: 95),
+                  _buildTableCol("REQUEST ID", minWidth: 150),
+                  _buildTableCol("SUPPLIER NAME", minWidth: 160),
+                  _buildTableCol("PRODUCT", minWidth: 200),
+                  _buildTableCol("QTY", minWidth: 60, align: TextAlign.center),
+                  _buildTableCol("STATUS", minWidth: 110),
+                ],
+                rows: pagedProcessList.map((item) {
+                  final isAccept = item['status'] == "ACCEPT";
+                  return DataRow(
+                    cells: [
+                      // S.NO
+                      DataCell(
+                        Container(
+                          constraints: const BoxConstraints(minWidth: 48),
+                          child: Text(
+                            item['s_no'].toString(),
+                            style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF334155)),
+                          ),
+                        ),
+                      ),
+                      // DATE
+                      DataCell(
+                        Container(
+                          constraints: const BoxConstraints(minWidth: 95),
+                          child: Text(
+                            item['date'].toString(),
+                            style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF475569)),
+                          ),
+                        ),
+                      ),
+                      // REQUEST ID with pencil icon and Dispatch Notes
+                      DataCell(
+                        ConstrainedBox(
+                          constraints: const BoxConstraints(minWidth: 150, maxWidth: 180),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                item['request_id'].toString(),
+                                style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold, color: const Color(0xFF2563EB)),
+                              ),
+                              if (item['notes'] != null && item['notes'].toString().isNotEmpty) ...[
+                                const SizedBox(height: 2),
+                                Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Icon(Icons.edit_outlined, size: 11, color: Color(0xFF94A3B8)),
+                                    const SizedBox(width: 3),
+                                    Flexible(
+                                      child: Text(
+                                        item['notes'].toString(),
+                                        style: GoogleFonts.inter(fontSize: 10, color: const Color(0xFF64748B)),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+                      ),
+                      // SUPPLIER NAME
+                      DataCell(
+                        ConstrainedBox(
+                          constraints: const BoxConstraints(minWidth: 160, maxWidth: 200),
+                          child: Text(
+                            item['supplier_name'].toString(),
+                            style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF334155)),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ),
+                      // PRODUCT (Square Box Icon + Product #ID + PRD-ID badge)
+                      DataCell(
+                        ConstrainedBox(
+                          constraints: const BoxConstraints(minWidth: 200, maxWidth: 240),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Container(
+                                width: 34,
+                                height: 34,
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFF1F5F9),
+                                  borderRadius: BorderRadius.circular(6),
+                                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                                ),
+                                child: const Icon(Icons.inventory_2_outlined, size: 18, color: Color(0xFF64748B)),
+                              ),
+                              const SizedBox(width: 8),
+                              Flexible(
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      item['product_name'].toString(),
+                                      style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700, color: const Color(0xFF0F172A)),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFF8FAFC),
+                                        borderRadius: BorderRadius.circular(4),
+                                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                                      ),
+                                      child: Text(
+                                        item['product_code'].toString(),
+                                        style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.bold, color: const Color(0xFF64748B)),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      // QTY (Green Rounded Pill)
+                      DataCell(
+                        Container(
+                          constraints: const BoxConstraints(minWidth: 60),
+                          child: Center(
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFDCFCE7),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Text(
+                                item['qty'].toString(),
+                                style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold, color: const Color(0xFF15803D)),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                      // STATUS (ACCEPT: Green Outline | PROGRESS: Blue Outline)
+                      DataCell(
+                        Container(
+                          constraints: const BoxConstraints(minWidth: 110),
+                          child: Align(
+                            alignment: Alignment.centerLeft,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: isAccept ? const Color(0xFFF0FDF4) : const Color(0xFFEFF6FF),
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(color: isAccept ? const Color(0xFF86EFAC) : const Color(0xFF93C5FD)),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    isAccept ? Icons.check_circle_outline : Icons.sync,
+                                    size: 13,
+                                    color: isAccept ? const Color(0xFF16A34A) : const Color(0xFF2563EB),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    item['status'].toString(),
+                                    style: GoogleFonts.inter(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.bold,
+                                      color: isAccept ? const Color(0xFF16A34A) : const Color(0xFF2563EB),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  );
+                }).toList(),
+              ),
+            ),
+            const SizedBox(height: 12),
+            _buildProcessPaginationBar(totalProcessPages, totalProcessItems),
+          ] else ...[
+            // PROCESS GRID VIEW (Photo 5)
+            // Grouped by Supplier Cards
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final isNarrow = constraints.maxWidth < 650;
+                final cards = supplierGroups.entries.map((entry) {
+                  final sId = entry.key;
+                  final list = entry.value;
+                  final sName = list.first['supplier_name'] ?? 'Supplier';
+                  int totalQty = 0;
+                  for (var it in list) {
+                    totalQty += (it['qty'] as int? ?? 0);
+                  }
+
+                  return Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                      boxShadow: const [
+                        BoxShadow(color: Color(0x06000000), blurRadius: 6, offset: Offset(0, 2)),
+                      ],
+                    ),
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Card Header: Avatar, Name, ID, Order Count Badge
+                        Row(
+                          children: [
+                            CircleAvatar(
+                              radius: 18,
+                              backgroundColor: const Color(0xFFEEF2FF),
+                              child: const Icon(Icons.storefront_outlined, size: 18, color: Color(0xFF4F46E5)),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    sName,
+                                    style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A)),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  Text(
+                                    "ID: $sId",
+                                    style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B)),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFF1F5F9),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: const Color(0xFFE2E8F0)),
+                              ),
+                              child: Text(
+                                "${list.length} Orders",
+                                style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600, color: const Color(0xFF475569)),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 14),
+
+                        // Stats Box: PROCESS ORDERS & SUPPLIER QTY
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF8FAFC),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: const Color(0xFFE2E8F0)),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceAround,
+                            children: [
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    "PROCESS ORDERS",
+                                    style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.bold, color: const Color(0xFF64748B)),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    list.length.toString(),
+                                    style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w800, color: const Color(0xFF0F172A)),
+                                  ),
+                                ],
+                              ),
+                              Container(width: 1, height: 30, color: const Color(0xFFCBD5E1)),
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    "SUPPLIER QTY",
+                                    style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.bold, color: const Color(0xFF64748B)),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    totalQty.toString(),
+                                    style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w800, color: const Color(0xFF0F172A)),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 14),
+
+                        // Button: View Products (X) >
+                        InkWell(
+                          onTap: () {
+                            setState(() {
+                              processSupplierFilter = sId;
+                              isProcessGridView = false;
+                            });
+                          },
+                          child: Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.symmetric(vertical: 10),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFEFF6FF),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: const Color(0xFFBFDBFE)),
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Text(
+                                  "View Products (${list.length})",
+                                  style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold, color: const Color(0xFF2563EB)),
+                                ),
+                                const SizedBox(width: 4),
+                                const Icon(Icons.chevron_right, size: 16, color: Color(0xFF2563EB)),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }).toList();
+
+                if (isNarrow) {
+                  return Column(
+                    children: cards.map((c) => Padding(padding: const EdgeInsets.only(bottom: 12), child: c)).toList(),
+                  );
+                }
+
+                return GridView.count(
+                  crossAxisCount: 2,
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  crossAxisSpacing: 14,
+                  mainAxisSpacing: 14,
+                  childAspectRatio: 1.6,
+                  children: cards,
+                );
+              },
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  // Process View Pagination Bar
+  Widget _buildProcessPaginationBar(int totalPages, int totalItems) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: const BoxDecoration(
+        border: Border(top: BorderSide(color: Color(0xFFE2E8F0))),
+      ),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final isMobile = constraints.maxWidth < 620;
+
+          final goToPageWidget = Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                "Go to Page:",
+                style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B)),
+              ),
+              const SizedBox(width: 8),
+              SizedBox(
+                width: 50,
+                height: 32,
+                child: TextField(
+                  controller: processGoToPageCtrl,
+                  keyboardType: TextInputType.number,
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A)),
+                  decoration: InputDecoration(
+                    contentPadding: EdgeInsets.zero,
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(6), borderSide: const BorderSide(color: Color(0xFFCBD5E1))),
+                    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(6), borderSide: const BorderSide(color: Color(0xFFCBD5E1))),
+                    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(6), borderSide: const BorderSide(color: Color(0xFF2563EB))),
+                  ),
+                  onSubmitted: (val) {
+                    final p = int.tryParse(val) ?? 1;
+                    if (p >= 1 && p <= totalPages) {
+                      setState(() {
+                        processCurrentPage = p;
+                        processGoToPageCtrl.text = p.toString();
+                      });
+                    } else {
+                      processGoToPageCtrl.text = processCurrentPage.toString();
+                    }
+                  },
+                ),
+              ),
+              const SizedBox(width: 12),
+              Text(
+                "Total: $totalItems items",
+                style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF94A3B8)),
+              ),
+            ],
+          );
+
+          final pageButtons = SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _buildPageNavBtn("«", processCurrentPage > 1, () {
+                  setState(() {
+                    processCurrentPage = 1;
+                    processGoToPageCtrl.text = "1";
+                  });
+                }),
+                const SizedBox(width: 4),
+                _buildPageNavBtn("<", processCurrentPage > 1, () {
+                  setState(() {
+                    processCurrentPage--;
+                    processGoToPageCtrl.text = processCurrentPage.toString();
+                  });
+                }),
+                const SizedBox(width: 4),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF2563EB),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    processCurrentPage.toString(),
+                    style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
+                  ),
+                ),
+                const SizedBox(width: 4),
+                _buildPageNavBtn(">", processCurrentPage < totalPages, () {
+                  setState(() {
+                    processCurrentPage++;
+                    processGoToPageCtrl.text = processCurrentPage.toString();
+                  });
+                }),
+                const SizedBox(width: 4),
+                _buildPageNavBtn("»", processCurrentPage < totalPages, () {
+                  setState(() {
+                    processCurrentPage = totalPages;
+                    processGoToPageCtrl.text = totalPages.toString();
+                  });
+                }),
+              ],
+            ),
+          );
+
+          if (isMobile) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                goToPageWidget,
+                const SizedBox(height: 10),
+                Center(child: pageButtons),
+              ],
+            );
+          }
+
+          return Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              goToPageWidget,
+              pageButtons,
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+
 
   // -----------------------------------------------------------------------
   // PAGINATION CONTROLS (Web Screenshot 1 & 3)
@@ -2823,14 +3463,14 @@ class _RestockRequestsPageState extends State<RestockRequestsPage> {
     );
   }
 
-  Widget _buildMetricCard({
-    required String title,
-    required String count,
-    required String subtitle,
-    required IconData icon,
-    required Color iconBg,
-    required Color iconColor,
-    required double width,
+  Widget _buildMetricCard(
+    String title,
+    String count,
+    String subtitle,
+    Color iconColor,
+    Color iconBg,
+    IconData icon, {
+    double? width,
   }) {
     return Container(
       width: width,
