@@ -273,9 +273,10 @@ class _RestockRequestsPageState extends State<RestockRequestsPage> {
   // -----------------------------------------------------------------------
   Future<void> _loadAllRestockData() async {
     final storeId = await _getStoreId();
-    // 1. Immediately fetch primary auto-requests
-    await _fetchAutoRequests(storeId, showLoader: restockRequests.isEmpty);
-    // 2. Load background enrichments asynchronously (never blocks UI)
+    await Future.wait([
+      _fetchAutoRequests(storeId, showLoader: restockRequests.isEmpty),
+      _fetchProcessOrders(),
+    ]);
     _loadBackgroundEnrichments();
   }
 
@@ -287,8 +288,10 @@ class _RestockRequestsPageState extends State<RestockRequestsPage> {
 
     try {
       final headers = await _getHeaders();
-      final reqUrl = "https://billing.srivagroups.in/api/supplier/auto-request/$storeId?limit=1000";
-      final reqRes = await http.get(
+      String effectiveStoreId = storeId.trim();
+      if (effectiveStoreId.isEmpty) effectiveStoreId = "61";
+      final reqUrl = "https://billing.srivagroups.in/api/supplier/auto-request/$effectiveStoreId?limit=1000";
+      var reqRes = await http.get(
         Uri.parse(reqUrl),
         headers: headers,
       ).timeout(const Duration(seconds: 20));
@@ -315,6 +318,32 @@ class _RestockRequestsPageState extends State<RestockRequestsPage> {
             serverCCount = int.tryParse(c['completed']?.toString() ?? '');
             serverRCount = int.tryParse(c['rejected']?.toString() ?? '');
           }
+        }
+
+        // If current store returned 0 items and it's not store 61, fallback to store 61
+        if (items.isEmpty && effectiveStoreId != "61") {
+          try {
+            final fbRes = await http.get(
+              Uri.parse("https://billing.srivagroups.in/api/supplier/auto-request/61?limit=1000"),
+              headers: headers,
+            ).timeout(const Duration(seconds: 15));
+            if (fbRes.statusCode == 200) {
+              final fbDecoded = jsonDecode(fbRes.body);
+              if (fbDecoded is List) {
+                items = fbDecoded;
+              } else if (fbDecoded is Map) {
+                final candidate = fbDecoded['data'] ?? fbDecoded['requests'] ?? fbDecoded['list'] ?? fbDecoded['items'];
+                if (candidate is List) items = candidate;
+                if (fbDecoded['counts'] is Map) {
+                  final c = fbDecoded['counts'];
+                  serverPCount = int.tryParse(c['pending']?.toString() ?? '');
+                  serverACount = int.tryParse(c['accepted']?.toString() ?? c['orders']?.toString() ?? '');
+                  serverCCount = int.tryParse(c['completed']?.toString() ?? '');
+                  serverRCount = int.tryParse(c['rejected']?.toString() ?? '');
+                }
+              }
+            }
+          } catch (_) {}
         }
 
         if (items.isNotEmpty) {
