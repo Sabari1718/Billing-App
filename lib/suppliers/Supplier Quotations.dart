@@ -37,7 +37,7 @@ class SupplierQuotationPage extends StatefulWidget {
 }
 
 class _SupplierQuotationPageState extends State<SupplierQuotationPage> {
-  List quotations = List.from(kLiveQuotationsData);
+  List quotations = [];
   bool isLoading = true;
   String searchQuery = "";
   String filterStatus = "All Status";
@@ -167,7 +167,7 @@ class _SupplierQuotationPageState extends State<SupplierQuotationPage> {
 
         if (mounted) {
           setState(() {
-            quotations = parsedList.isNotEmpty ? parsedList : List.from(kLiveQuotationsData);
+            quotations = parsedList;
             isLoading = false;
           });
           return;
@@ -179,7 +179,7 @@ class _SupplierQuotationPageState extends State<SupplierQuotationPage> {
 
     if (mounted) {
       setState(() {
-        quotations = List.from(kLiveQuotationsData);
+        quotations = [];
         isLoading = false;
       });
     }
@@ -394,8 +394,8 @@ class _SupplierQuotationPageState extends State<SupplierQuotationPage> {
                             : filtered.isEmpty
                                 ? const Center(
                                     child: Padding(
-                                      padding: EdgeInsets.all(32),
-                                      child: Text("No quotations matching the filter", style: TextStyle(color: Color(0xFF64748B))),
+                                      padding: EdgeInsets.symmetric(vertical: 40),
+                                      child: Text("No quotations found.", style: TextStyle(color: Color(0xFF64748B), fontSize: 13)),
                                     ),
                                   )
                                 : isMobile
